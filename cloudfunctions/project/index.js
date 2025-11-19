@@ -44,8 +44,38 @@ exports.main = async (event, context) => {
  */
 const MAX_USER_QUERY_COUNT = 20
 
-async function getList(params, wxContext) {
-  const { category, keyword, page = 1, pageSize = 10, includePrivate = false } = params
+async function getList(params = {}, wxContext = {}) {
+  const { category, keyword, page = 1, pageSize = 10, includePrivate: includePrivateParam = false } = params
+  const { OPENID } = wxContext || {}
+
+  let allowPrivateFields = false
+
+  if (includePrivateParam && OPENID) {
+    const userResult = await db.collection('users')
+      .where({
+        _openid: OPENID
+      })
+      .field({
+        role: true,
+        permissions: true,
+        canViewPrivateContacts: true
+      })
+      .limit(1)
+      .get()
+
+    const requester = userResult.data?.[0]
+    if (requester) {
+      const hasAdminRole = requester.role === 'admin'
+      const hasContactPermission = requester.canViewPrivateContacts === true
+      const hasPermissionFlag = Array.isArray(requester.permissions) && (
+        requester.permissions.includes('viewPrivateContacts') ||
+        requester.permissions.includes('viewProjectPrivateContact')
+      )
+      allowPrivateFields = hasAdminRole || hasContactPermission || hasPermissionFlag
+    }
+  }
+
+  const shouldIncludePrivate = includePrivateParam && allowPrivateFields
 
   // 构建查询条件
   const query = {
@@ -79,7 +109,7 @@ async function getList(params, wxContext) {
 
   let list = projectsResult.data || []
 
-  if (includePrivate && list.length) {
+  if (shouldIncludePrivate && list.length) {
     const publisherUids = Array.from(new Set(list.map(item => item.publisherUid).filter(Boolean)))
     let userMap = {}
 
@@ -122,7 +152,7 @@ async function getList(params, wxContext) {
         publisherWechat: project.publisherWechat || contactUser?.wechat || ''
       }
     })
-  } else if (!includePrivate && list.length) {
+  } else if (list.length) {
     const privateFields = ['registeredEntity', 'publisherName', 'publisherPhone', 'publisherWechat']
     list = list.map(project => {
       const sanitized = { ...project }
