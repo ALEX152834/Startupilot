@@ -8,6 +8,7 @@ cloud.init({
 
 const db = cloud.database()
 const _ = db.command
+const $ = db.command.aggregate
 const DUPLICATE_SUBMIT_WINDOW = 5000
 
 exports.main = async (event, context) => {
@@ -42,8 +43,6 @@ exports.main = async (event, context) => {
 /**
  * 获取项目列表
  */
-const MAX_USER_QUERY_COUNT = 20
-
 async function getList(params = {}, wxContext = {}) {
   const { category, keyword, page = 1, pageSize = 10, includePrivate: includePrivateParam = false } = params
   const { OPENID } = wxContext || {}
@@ -100,59 +99,37 @@ async function getList(params = {}, wxContext = {}) {
     .where(query)
     .count()
 
-  const projectsResult = await db.collection('projects')
-    .where(query)
-    .orderBy('createdAt', 'desc')
+  const aggregationResult = await db.collection('projects')
+    .aggregate()
+    .match(query)
+    .sort({
+      createdAt: -1
+    })
     .skip((page - 1) * pageSize)
     .limit(pageSize)
-    .get()
-
-  let list = projectsResult.data || []
-
-  if (shouldIncludePrivate && list.length) {
-    const publisherUids = Array.from(new Set(list.map(item => item.publisherUid).filter(Boolean)))
-    let userMap = {}
-
-    if (publisherUids.length) {
-      const userChunks = []
-      for (let i = 0; i < publisherUids.length; i += MAX_USER_QUERY_COUNT) {
-        const batchUids = publisherUids.slice(i, i + MAX_USER_QUERY_COUNT)
-        userChunks.push(
-          db.collection('users')
-            .where({
-              uid: _.in(batchUids)
-            })
-            .field({
-              uid: true,
-              name: true,
-              phone: true,
-              wechat: true
-            })
-            .get()
-        )
-      }
-
-      const userResults = await Promise.all(userChunks)
-      userMap = userResults
-        .flatMap(result => result.data || [])
-        .reduce((map, user) => {
-          if (user.uid) {
-            map[user.uid] = user
-          }
-          return map
-        }, {})
-    }
-
-    list = list.map(project => {
-      const contactUser = project.publisherUid ? userMap[project.publisherUid] : null
-      return {
-        ...project,
-        publisherName: project.publisherName || contactUser?.name || '创业者',
-        publisherPhone: project.publisherPhone || contactUser?.phone || '',
-        publisherWechat: project.publisherWechat || contactUser?.wechat || ''
-      }
+    .lookup({
+      from: 'users',
+      localField: 'publisherUid',
+      foreignField: 'uid',
+      as: 'publisher'
     })
-  } else if (list.length) {
+    .addFields({
+      publisherName: $.ifNull([
+        '$publisherName',
+        $.ifNull([$.arrayElemAt(['$publisher.name', 0]), '创业者'])
+      ]),
+      publisherPhone: $.ifNull(['$publisherPhone', $.arrayElemAt(['$publisher.phone', 0])]),
+      publisherWechat: $.ifNull(['$publisherWechat', $.arrayElemAt(['$publisher.wechat', 0])]),
+      publisherAvatar: $.arrayElemAt(['$publisher.wechatAvatar', 0])
+    })
+    .project({
+      publisher: 0
+    })
+    .end()
+
+  let list = aggregationResult.list || []
+
+  if (!shouldIncludePrivate && list.length) {
     const privateFields = ['registeredEntity', 'publisherName', 'publisherPhone', 'publisherWechat']
     list = list.map(project => {
       const sanitized = { ...project }
@@ -240,6 +217,37 @@ async function publish(params, wxContext) {
     publisherPhone: publisherPhone || '',
     publisherWechat: publisherWechat || '',
     updatedAt: now
+  }
+
+  // 内容安全校验
+  try {
+    const contentToCheck = [
+      params.title,
+      params.description,
+      params.projectName,
+      params.oneLiner,
+      params.introduction
+    ].filter(Boolean).join(' ')
+
+    const msgCheck = await cloud.openapi.security.msgSecCheck({
+      content: contentToCheck,
+      version: 2,
+      scene: 2,
+      openid: OPENID
+    })
+
+    if (msgCheck?.result?.suggest !== 'pass') {
+      return {
+        code: 500,
+        message: '内容包含敏感信息'
+      }
+    }
+  } catch (err) {
+    logger.error('[project.publish] 内容安全校验失败', err)
+    return {
+      code: 500,
+      message: '安全检测不通过'
+    }
   }
 
   // 防止重复提交：同一用户在短时间内提交完全相同的项目

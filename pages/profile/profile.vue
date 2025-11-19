@@ -182,6 +182,7 @@ import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
 import { buildCloudFilePath } from '@/utils/cloud-storage'
 import { logger } from '@/utils/logger'
+import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const userStore = useUserStore()
 const { stats } = storeToRefs(userStore)
@@ -204,7 +205,7 @@ const isValidNumber = (value) => typeof value === 'number' && !Number.isNaN(valu
 const ensureNumber = (value, fallback) => (isValidNumber(value) ? value : fallback)
 const toPx = (value, fallback) => `${ensureNumber(value, fallback)}px`
 const menuButtonInfo = ref({ ...DEFAULT_MENU_BUTTON_INFO })
-let pageAlive = true
+const { isAlive, safeRun } = useSafeAsync()
 const initNavbarMetrics = () => {
   try {
     let info = null
@@ -232,7 +233,7 @@ const initLogo = async () => {
         fileList: [LOGO_CLOUD_PATH]
       })
       const tempFileURL = res.fileList?.[0]?.tempFileURL
-      if (tempFileURL && pageAlive) {
+      if (tempFileURL && isAlive.value) {
         logoUrl.value = tempFileURL
         return
       }
@@ -240,9 +241,9 @@ const initLogo = async () => {
   } catch (error) {
     logger.error('[pages/profile] 加载Logo失败', error)
   }
-  if (pageAlive) {
+  safeRun(() => {
     logoUrl.value = LOGO_CLOUD_PATH
-  }
+  })
 }
 const navHeight = computed(() => {
   const info = menuButtonInfo.value || DEFAULT_MENU_BUTTON_INFO
@@ -329,7 +330,7 @@ const loadStyledIcons = async () => {
       getTempFileURL(CLOUD_STORAGE.profile.settings, 'jianjin'),
       getTempFileURL(CLOUD_STORAGE.profile.logout, 'jianjin')
     ])
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
     
@@ -345,7 +346,7 @@ const loadStyledIcons = async () => {
   } catch (error) {
     logger.error('[pages/profile] 加载图标失败', error)
     // 失败时使用原始 URL
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
     baseMenuList.value[0].icon = CLOUD_STORAGE.profile.favorites
@@ -366,7 +367,7 @@ const formatDate = (date) => {
 
 // 加载用户统计
 const loadStats = async () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   logger.log('[pages/profile] 开始加载统计', { isLogin: userStore.isLogin })
   
   if (!userStore.isLogin) {
@@ -382,9 +383,9 @@ const loadStats = async () => {
     logger.log('[pages/profile] 最终设置的 stats', stats.value)
   } catch (error) {
     logger.error('[pages/profile] 加载统计失败', error)
-    if (pageAlive) {
+    safeRun(() => {
       userStore.$patch({ stats: { ...defaultStats } })
-    }
+    })
   }
 }
 
@@ -567,7 +568,6 @@ const onRedeemSuccess = () => {
 }
 
 onLoad(() => {
-  pageAlive = true
   initNavbarMetrics()
   initLogo()
 })
@@ -589,7 +589,7 @@ onMounted(async () => {
       ]
     })
     const fileList = (res && res.fileList) || []
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
     if (fileList[0] && fileList[0].tempFileURL) {
@@ -625,11 +625,11 @@ onShow(() => {
 })
 
 onUnmounted(() => {
-  pageAlive = false
+  // no-op: alive flag handled by useSafeAsync
 })
 
 onUnload(() => {
-  pageAlive = false
+  // no-op: alive flag handled by useSafeAsync
 })
 </script>
 

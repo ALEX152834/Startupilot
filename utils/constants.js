@@ -164,8 +164,7 @@ export const EMPTY_STATE_CONFIG = {
   favorite: {
     icon: '⭐',
     title: '暂无收藏',
-    description: '还没有收藏，先去逛逛广场吧',
-    buttonText: '去逛逛广场'
+    description: '还没有收藏，先去逛逛吧',
+    buttonText: '去逛逛'
   }
 }
-

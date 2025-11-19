@@ -118,7 +118,7 @@ const handleUnfavorite = async (item) => {
 
 const handleEmptyAction = () => {
   uni.switchTab({
-    url: '/pages/projects/projects'
+    url: '/pages/learning/learning'
   })
 }
 
