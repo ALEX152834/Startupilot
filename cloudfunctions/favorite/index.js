@@ -124,28 +124,32 @@ async function remove(params, wxContext) {
   const uid = userResult.data[0]?.uid
 
   // 删除收藏
-  await db.collection('favorites')
+  const removeResult = await db.collection('favorites')
     .where({
       uid: uid,
       itemId: itemId
     })
     .remove()
 
-  // 更新用户统计
-  await db.collection('user_stats')
-    .where({
-      uid: uid
-    })
-    .update({
-      data: {
-        favoritesCount: _.inc(-1),
-        updatedAt: new Date()
-      }
-    })
+  const removedCount = removeResult?.stats?.removed ?? removeResult?.removed ?? 0
+
+  if (removedCount > 0) {
+    // 更新用户统计（仅在确实删除记录时）
+    await db.collection('user_stats')
+      .where({
+        uid: uid
+      })
+      .update({
+        data: {
+          favoritesCount: _.inc(-1),
+          updatedAt: new Date()
+        }
+      })
+  }
 
   return {
     code: 0,
-    message: '取消收藏',
+    message: removedCount > 0 ? '取消收藏' : '收藏记录不存在',
     data: null
   }
 }
