@@ -1,0 +1,61 @@
+/* 主题色 */
+$primary-blue: #3B82F6;
+$primary-purple: #9333EA;
+$primary-pink: #EC4899;
+
+/* 渐变色 */
+$gradient-primary: linear-gradient(to right, #3B82F6, #9333EA, #EC4899);
+$gradient-blue: linear-gradient(to right, #3B82F6, #9333EA);
+$gradient-purple: linear-gradient(to right, #9333EA, #EC4899);
+
+/* NEO会员专属色 */
+$neo-gradient: linear-gradient(135deg, #06B6D4, #3B82F6, #9333EA);
+$neo-glow: rgba(6, 182, 212, 0.5);
+
+/* 文字颜色 */
+$text-primary: #1F2937;
+$text-secondary: #6B7280;
+$text-tertiary: #9CA3AF;
+$text-white: #FFFFFF;
+
+/* 背景颜色 */
+$bg-color: #FFFFFF;
+$bg-white: #FFFFFF;
+
+/* 玻璃态效果 */
+$glass-bg: rgba(255, 255, 255, 0.7);
+$glass-border: rgba(255, 255, 255, 0.3);
+$glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+/* 圆角 */
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$radius-xl: 20px;
+$radius-full: 9999px;
+
+/* 间距 */
+$spacing-xs: 8px;
+$spacing-sm: 12px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+/* 阴影 */
+$shadow-card: 0 4px 6px rgba(0, 0, 0, 0.1);
+$shadow-button: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-hover: 0 8px 16px rgba(0, 0, 0, 0.15);
+
+/* 字体大小 */
+$font-xs: 24rpx;    // 12px
+$font-sm: 28rpx;    // 14px
+$font-base: 32rpx;  // 16px
+$font-lg: 40rpx;    // 20px
+$font-xl: 56rpx;    // 28px
+$font-2xl: 68rpx;   // 34px
+
+/* 过渡动画 */
+$transition-fast: 0.1s;
+$transition-base: 0.2s;
+$transition-slow: 0.3s;
+

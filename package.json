@@ -1,0 +1,40 @@
+{
+  "name": "startupilot-miniapp",
+  "version": "1.0.0",
+  "description": "Startupilot 创业者服务平台微信小程序",
+  "main": "main.js",
+  "scripts": {
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-alpha-4080620251107001",
+    "pinia": "2.1.7",
+    "vue": "3.5.24"
+  },
+  "devDependencies": {
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-4080620251107001",
+    "@rollup/rollup-linux-x64-gnu": "^4.53.2",
+    "sass": "^1.69.5",
+    "vite": "^5.2.8"
+  },
+  "overrides": {
+    "@vue/shared": "3.5.24",
+    "@vue/runtime-core": "3.5.24",
+    "@vue/runtime-dom": "3.5.24",
+    "@vue/runtime-test": "3.5.24",
+    "@vue/compiler-sfc": "3.5.24",
+    "@vue/compiler-dom": "3.5.24",
+    "@vue/compiler-core": "3.5.24",
+    "@vue/reactivity": "3.5.24",
+    "@vue/server-renderer": "3.5.24"
+  },
+  "keywords": [
+    "uni-app",
+    "微信小程序",
+    "创业",
+    "学习平台"
+  ],
+  "author": "Startupilot Team",
+  "license": "MIT"
+}

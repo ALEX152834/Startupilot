@@ -1,0 +1,36 @@
+{
+    "name" : "Startupilot",
+    "appid" : "__UNI__F9C90BF",
+    "description" : "创业者服务平台 - 活动预约、学习资源、项目对接",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "vueVersion" : "3",
+    "transformPx" : false,
+    "mp-weixin" : {
+        "appid" : "wxada416dddaa7aecd",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : true,
+            "postcss" : true,
+            "minified" : true,
+            "newFeature" : true
+        },
+        "lazyCodeLoading" : "requiredComponents",
+        "usingComponents" : true,
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "用于显示线下活动位置"
+            }
+        },
+        "requiredPrivateInfos" : [ "getLocation" ],
+        "cloudfunctionRoot" : "cloudfunctions/"
+    },
+    "h5" : {
+        "title" : "Startupilot",
+        "router" : {
+            "mode" : "hash"
+        }
+    },
+    "quickapp" : {},
+    "app-plus" : {}
+}

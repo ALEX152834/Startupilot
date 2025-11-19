@@ -1,0 +1,14 @@
+node_modules/
+unpackage/
+dist/
+.DS_Store
+*.log
+.hbuilderx
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+

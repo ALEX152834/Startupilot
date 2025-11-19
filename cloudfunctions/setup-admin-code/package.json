@@ -1,0 +1,9 @@
+{
+  "name": "setup-admin-code",
+  "version": "1.0.0",
+  "description": "创建管理员特殊兑换码",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

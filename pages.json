@@ -1,0 +1,160 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/learning/learning",
+      "style": {
+        "navigationBarTitleText": "Founder Think",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/projects/projects",
+      "style": {
+        "navigationBarTitleText": "Founder Square",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/profile/profile",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "subPackages": [
+    {
+      "root": "subPackages/profile",
+      "pages": [
+        {
+          "path": "favorites/favorites",
+          "style": {
+            "navigationBarTitleText": "我的收藏"
+          }
+        },
+        {
+          "path": "posts/posts",
+          "style": {
+            "navigationBarTitleText": "我的发布"
+          }
+        },
+        {
+          "path": "registrations/registrations",
+          "style": {
+            "navigationBarTitleText": "我的报名"
+          }
+        },
+        {
+          "path": "settings/settings",
+          "style": {
+            "navigationBarTitleText": "设置与条款"
+          }
+        }
+      ]
+    },
+    {
+      "root": "subPackages/projects",
+      "pages": [
+        {
+          "path": "publish/publish",
+          "style": {
+            "navigationBarTitleText": "发布项目"
+          }
+        }
+      ]
+    },
+    {
+      "root": "pages/admin",
+      "pages": [
+        {
+          "path": "redeem-codes",
+          "style": {
+            "navigationBarTitleText": "兑换码管理",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "projects-admin",
+          "style": {
+            "navigationBarTitleText": "项目管理（管理员）",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "bookings",
+          "style": {
+            "navigationBarTitleText": "预约管理",
+            "navigationStyle": "custom"
+          }
+        },
+        {
+          "path": "publish-permissions",
+          "style": {
+            "navigationBarTitleText": "发布权限管理",
+            "navigationStyle": "custom"
+          }
+        }
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/index/index": {
+      "network": "all",
+      "packages": ["subPackages/profile"]
+    },
+    "pages/learning/learning": {
+      "network": "all",
+      "packages": ["subPackages/profile"]
+    },
+    "pages/projects/projects": {
+      "network": "all",
+      "packages": ["subPackages/projects"]
+    }
+  },
+  "tabBar": {
+    "color": "#6B7280",
+    "selectedColor": "#000000",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "开始",
+        "iconPath": "static/tabbar/home.png",
+        "selectedIconPath": "static/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/learning/learning",
+        "text": "智库",
+        "iconPath": "static/tabbar/learning.png",
+        "selectedIconPath": "static/tabbar/learning-active.png"
+      },
+      {
+        "pagePath": "pages/projects/projects",
+        "text": "链接",
+        "iconPath": "static/tabbar/projects.png",
+        "selectedIconPath": "static/tabbar/projects-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我",
+        "iconPath": "static/tabbar/profile.png",
+        "selectedIconPath": "static/tabbar/profile-active.png"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Startupilot",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#FFFFFF"
+  },
+  "uniIdRouter": {}
+}
+

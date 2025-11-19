@@ -1,0 +1,61 @@
+@import './variables.scss';
+
+/* 玻璃态效果 */
+@mixin glass-effect {
+  background: $glass-bg;
+  border: 1px solid $glass-border;
+  box-shadow: $glass-shadow;
+  backdrop-filter: blur(10px);
+}
+
+/* 渐变背景 */
+@mixin gradient-bg($gradient) {
+  background: $gradient;
+}
+
+/* 卡片悬停效果 */
+@mixin card-hover {
+  transition: all $transition-base ease;
+  
+  &:active {
+    transform: translateY(-2px);
+    box-shadow: $shadow-hover;
+  }
+}
+
+/* 按钮点击效果 */
+@mixin button-active {
+  transition: all $transition-fast ease;
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+/* 文本渐变 */
+@mixin text-gradient($gradient) {
+  background: $gradient;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 居中定位 */
+@mixin absolute-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 安全区域 */
+@mixin safe-area-inset-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+@mixin safe-area-inset-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+

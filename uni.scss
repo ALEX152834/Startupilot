@@ -1,0 +1,30 @@
+/**
+ * uni-app 样式变量
+ * 这里的样式变量会被编译到每个 scss 文件中
+ */
+
+@import '@/styles/variables.scss';
+
+/* uni-app 内置变量 */
+$uni-color-primary: #3B82F6;
+$uni-color-success: #4ade80;
+$uni-color-warning: #fbbf24;
+$uni-color-error: #ef4444;
+
+$uni-font-size-sm: 24rpx;
+$uni-font-size-base: 28rpx;
+$uni-font-size-lg: 32rpx;
+
+$uni-spacing-row-sm: 16rpx;
+$uni-spacing-row-base: 24rpx;
+$uni-spacing-row-lg: 32rpx;
+
+$uni-spacing-col-sm: 16rpx;
+$uni-spacing-col-base: 24rpx;
+$uni-spacing-col-lg: 32rpx;
+
+$uni-border-radius-sm: 12rpx;
+$uni-border-radius-base: 16rpx;
+$uni-border-radius-lg: 24rpx;
+$uni-border-radius-circle: 50%;
+
