@@ -55,6 +55,17 @@ export const useUserStore = defineStore('user', {
   },
 
   actions: {
+    resetState() {
+      this.userInfo = null
+      this.token = ''
+      this.isLogin = false
+      this.stats = {
+        favoritesCount: 0,
+        postsCount: 0,
+        registrationsCount: 0
+      }
+    },
+
     // 检查登录状态
     checkLogin() {
       const userInfo = getStoredUserInfo()
@@ -90,15 +101,14 @@ export const useUserStore = defineStore('user', {
 
     // 退出登录
     logout() {
-      this.userInfo = null
-      this.token = ''
-      this.isLogin = false
-      this.stats = {
-        favoritesCount: 0,
-        postsCount: 0,
-        registrationsCount: 0
-      }
+      this.resetState()
       logoutUtil()
+    },
+
+    // 强制退出但不跳转（用于登录失效拦截）
+    forceLogoutSilently() {
+      this.resetState()
+      storage.removeUserInfo()
     },
 
     // 更新用户信息

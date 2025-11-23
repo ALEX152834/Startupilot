@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { useEventStore } from '@/store/event'
 import { useUserStore } from '@/store/user'
@@ -139,10 +139,11 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import FormModal from '@/components/modals/form-modal.vue'
 import { trackEvent } from '@/utils/auth'
 import { TRACK_EVENTS } from '@/utils/constants'
-import { CLOUD_STORAGE, getTempFileURLs, getTempFileURL, buildCloudFilePath } from '@/utils/cloud-storage'
+import { CLOUD_STORAGE, getTempFileURLs, buildCloudFilePath } from '@/utils/cloud-storage'
 import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
+import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const eventStore = useEventStore()
@@ -152,13 +153,23 @@ const loading = ref(false)
 const refreshing = ref(false)
 const showFormModal = ref(false)
 const pendingEventId = ref('')
-const menuButtonInfo = ref({ top: 32, height: 32, bottom: 64 })
 const NAV_EXTRA_PADDING = 8
-const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/白色Logo.png')
+const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/顶部白Logo.png')
 const shareTitle = '创业者-赋能社群'
 const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
 const sharePath = '/pages/index/index'
 const { isAlive, safeRun } = useSafeAsync()
+const {
+  navbarHeightStyle,
+  buildLogoRowStyle,
+  buildContentPaddingStyle,
+  refreshNavbarMetrics
+} = useNavbar({
+  defaultMenuButtonInfo: { top: 32, height: 32, left: 0, bottom: 64 },
+  extraPadding: NAV_EXTRA_PADDING,
+  enableWindowInfo: false,
+  logPrefix: '[pages/index]'
+})
 
 useShare({
   title: shareTitle,
@@ -173,29 +184,9 @@ defineExpose({
 })
 const logoUrl = ref('')
 let loadEventsTaskId = 0
-
-const navHeight = computed(() => {
-  const bottom = menuButtonInfo.value?.bottom
-  if (bottom) {
-    return bottom + NAV_EXTRA_PADDING
-  }
-  const top = menuButtonInfo.value?.top || 0
-  const height = menuButtonInfo.value?.height || 0
-  return top + height + NAV_EXTRA_PADDING
-})
-
-const navbarStyle = computed(() => ({
-  height: `${navHeight.value}px`
-}))
-
-const logoRowStyle = computed(() => ({
-  marginTop: `${menuButtonInfo.value?.top || 0}px`,
-  height: `${menuButtonInfo.value?.height || 0}px`
-}))
-
-const pageContentStyle = computed(() => ({
-  paddingTop: `${navHeight.value}px`
-}))
+const navbarStyle = navbarHeightStyle
+const logoRowStyle = buildLogoRowStyle()
+const pageContentStyle = buildContentPaddingStyle()
 
 // 活动列表
 const eventList = ref([])
@@ -243,22 +234,6 @@ const localEvents = [
 
 // 云存储图片 - 关于我们（带 jianjin 样式）
 const aboutImages = ref([])
-const initNavbarMetrics = () => {
-  try {
-    let info = null
-    if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
-      info = wx.getMenuButtonBoundingClientRect()
-    } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
-      info = uni.getMenuButtonBoundingClientRect()
-    }
-    if (info && info.height && info.top !== undefined) {
-      menuButtonInfo.value = info
-    }
-  } catch (error) {
-    logger.error('[pages/index] 获取胶囊信息失败', error)
-  }
-
-}
 
 const initLogo = async () => {
   if (logoUrl.value) return
@@ -300,12 +275,12 @@ const loadStyledImages = async () => {
 // 加载带样式的活动图片
 const loadStyledEventImages = async () => {
   try {
-    const styledEvents = await Promise.all(
-      localEvents.map(async (event) => {
-        const styledImage = await getTempFileURL(event.image, 'jianjin')
-        return { ...event, image: styledImage }
-      })
-    )
+    const fileIds = localEvents.map(event => event.image)
+    const styledImages = await getTempFileURLs(fileIds, 'jianjin')
+    const styledEvents = localEvents.map((event, index) => ({
+      ...event,
+      image: styledImages?.[index] || event.image
+    }))
     return styledEvents
   } catch (error) {
     logger.error('[pages/index] 加载活动图片失败', error)
@@ -538,7 +513,7 @@ const toggleFAQ = (index) => {
 }
 
 onLoad(() => {
-  initNavbarMetrics()
+  refreshNavbarMetrics()
   initLogo()
 })
 

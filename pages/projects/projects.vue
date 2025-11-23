@@ -94,6 +94,7 @@
               :project="project"
               :is-login="userStore.isLogin"
               :action-type="isAdmin ? 'delete' : 'connect'"
+              @tap="handleProjectView(project)"
               @connect="handleConnect"
               @authorize="handleConnectAuthorize"
               @delete="handleAdminDelete"
@@ -153,6 +154,8 @@ import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 import { buildCloudFilePath } from '@/utils/cloud-storage'
+import { useNavbar } from '@/composables/useNavbar'
+import { projectApi } from '@/utils/request'
 
 const projectStore = useProjectStore()
 const userStore = useUserStore()
@@ -189,10 +192,22 @@ const projectList = ref([])
 const hasMore = ref(true)
 const SEARCH_DEBOUNCE_DELAY = 300
 const EXTRA_GAP = 12
-const menuButtonInfo = ref({ height: 64, top: 32, left: 0 })
-const windowInfo = ref({ windowWidth: 375 })
+const {
+  navbarPaddingStyle,
+  navbarRowStyle,
+  buildSearchContainerStyle,
+  buildSearchBoxStyle,
+  buildContentTopStyle,
+  refreshNavbarMetrics
+} = useNavbar({
+  defaultMenuButtonInfo: { height: 64, top: 32, left: 0 },
+  defaultWindowInfo: { windowWidth: 375 },
+  rightGap: EXTRA_GAP,
+  logPrefix: '[pages/projects]'
+})
 let searchDebounceTimer = null
 let loadProjectsTaskId = 0
+const viewedProjectIds = new Set()
 
 const showFormModal = ref(false)
 const adminDeleteLock = ref(false)
@@ -261,71 +276,18 @@ const clearSearch = () => {
   doProjectSearch('', { track: false })
 }
 
-const rightSafeWidth = computed(() => {
-  const width = windowInfo.value?.windowWidth || 0
-  const left = menuButtonInfo.value?.left || width
-  return Math.max(0, width - left + EXTRA_GAP)
-})
-
-const searchRowHeight = computed(() => menuButtonInfo.value?.height || 64)
-const navbarStyle = computed(() => ({
-  paddingTop: `${menuButtonInfo.value?.top || 0}px`
-}))
-const navbarRowStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`
-}))
-const searchContainerStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`,
-  marginRight: `${rightSafeWidth.value}px`
-}))
-const searchBoxStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`
-}))
-const pageTopOffset = computed(() => {
-  const top = menuButtonInfo.value?.top || 0
-  const height = searchRowHeight.value
-  const extra = 24
-  return top + height + extra
-})
-const pageContentStyle = computed(() => ({
-  top: `${pageTopOffset.value}px`
-}))
-
-const initNavbarMetrics = () => {
-  try {
-    let info = null
-    if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
-      info = wx.getMenuButtonBoundingClientRect()
-    } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
-      info = uni.getMenuButtonBoundingClientRect()
-    }
-
-    if (info && info.height && info.top !== undefined) {
-      menuButtonInfo.value = info
-    }
-  } catch (error) {
-    logger.error('[pages/projects] 获取胶囊信息失败', error)
-  }
-
-  const getWindowInfo = () => {
-    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
-      return wx.getWindowInfo()
-    }
-    if (typeof uni !== 'undefined' && typeof uni.getWindowInfo === 'function') {
-      return uni.getWindowInfo()
-    }
-    return null
-  }
-
-  try {
-    const info = getWindowInfo()
-    if (info && info.windowWidth) {
-      windowInfo.value = info
-    }
-  } catch (error) {
-    logger.error('[pages/projects] 获取 window 信息失败', error)
-  }
+// 浏览计数（静默，避免重复）
+const handleProjectView = (project) => {
+  const id = project?._id
+  if (!id || viewedProjectIds.has(id)) return
+  viewedProjectIds.add(id)
+  projectApi.viewProject(id)
 }
+
+const navbarStyle = navbarPaddingStyle
+const searchContainerStyle = buildSearchContainerStyle()
+const searchBoxStyle = buildSearchBoxStyle()
+const pageContentStyle = buildContentTopStyle(24)
 
 // 加载项目列表
 const loadProjects = async (refresh = false) => {
@@ -547,7 +509,7 @@ const handleAdminDelete = (project) => {
 }
 
 onLoad(() => {
-  initNavbarMetrics()
+  refreshNavbarMetrics()
 })
 
 onMounted(() => {

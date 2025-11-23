@@ -8,6 +8,10 @@ cloud.init({
 
 const db = cloud.database()
 const _ = db.command
+const normalizeVipLevel = (level) => {
+  const normalized = (level || '').toString().trim().toLowerCase()
+  return normalized === 'neo' ? 'neo' : 'regular'
+}
 
 exports.main = async (event, context) => {
   const { action, params } = event
@@ -97,13 +101,15 @@ async function getList(params, wxContext) {
 
   // 添加权限和收藏状态
   const list = resourcesResult.data.map(resource => {
+    const requiredVipLevel = normalizeVipLevel(resource.requiredVipLevel)
     const canAccess = !user ? false : (
-      resource.requiredVipLevel === 'regular' ||
-      (resource.requiredVipLevel === 'neo' && user.vipLevel === 'neo' && new Date(user.vipExpiry) > new Date())
+      requiredVipLevel === 'regular' ||
+      (requiredVipLevel === 'neo' && user.vipLevel === 'neo' && new Date(user.vipExpiry) > new Date())
     )
 
     return {
       ...resource,
+      requiredVipLevel,
       canAccess,
       isFavorited: favoritedIds.includes(resource._id)
     }
@@ -157,7 +163,8 @@ async function getResource(params, wxContext) {
   const resource = resourceResult.data
 
   // 检查VIP权限
-  if (resource.requiredVipLevel === 'neo') {
+  const requiredVipLevel = normalizeVipLevel(resource.requiredVipLevel)
+  if (requiredVipLevel === 'neo') {
     if (user.vipLevel !== 'neo') {
       return {
         code: 1003,

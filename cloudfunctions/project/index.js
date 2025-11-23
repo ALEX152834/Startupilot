@@ -25,6 +25,8 @@ exports.main = async (event, context) => {
         return await getMyPosts(params, wxContext)
       case 'delete':
         return await deleteProject(params, wxContext)
+      case 'viewProject':
+        return await viewProject(params, wxContext)
       default:
         return {
           code: 1001,
@@ -99,6 +101,15 @@ async function getList(params = {}, wxContext = {}) {
     .where(query)
     .count()
 
+  const listProjection = shouldIncludePrivate
+    ? { publisher: 0 }
+    : {
+        publisher: 0,
+        bestPractices: 0,
+        coreProducts: 0,
+        moreInfo: 0
+      }
+
   const aggregationResult = await db.collection('projects')
     .aggregate()
     .match(query)
@@ -123,7 +134,7 @@ async function getList(params = {}, wxContext = {}) {
       publisherAvatar: $.arrayElemAt(['$publisher.wechatAvatar', 0])
     })
     .project({
-      publisher: 0
+      ...listProjection
     })
     .end()
 
@@ -293,30 +304,30 @@ async function publish(params, wxContext) {
     }
   }
 
-  // 创建项目
-  const projectResult = await db.collection('projects').add({
-    data: {
-      publisherUid: user.uid,
-      publisherName: user.name,
-      status: 'active',
-      viewCount: 0,
-      contactCount: 0,
-      createdAt: now,
-      ...editableData
-    }
-  })
-
-  // 更新用户统计
-  await db.collection('user_stats')
-    .where({
-      uid: user.uid
-    })
-    .update({
+  // 创建项目与统计更新并行
+  const [projectResult] = await Promise.all([
+    db.collection('projects').add({
       data: {
-        postsCount: _.inc(1),
-        updatedAt: now
+        publisherUid: user.uid,
+        publisherName: user.name,
+        status: 'active',
+        viewCount: 0,
+        contactCount: 0,
+        createdAt: now,
+        ...editableData
       }
-    })
+    }),
+    db.collection('user_stats')
+      .where({
+        uid: user.uid
+      })
+      .update({
+        data: {
+          postsCount: _.inc(1),
+          updatedAt: now
+        }
+      })
+  ])
 
   return {
     code: 0,
@@ -422,6 +433,45 @@ async function deleteProject(params, wxContext) {
     code: 0,
     message: '删除成功',
     data: null
+  }
+}
+
+/**
+ * 浏览项目：仅做浏览量自增，轻量原子操作
+ */
+async function viewProject(params = {}, wxContext = {}) {
+  const { projectId } = params || {}
+  const { OPENID } = wxContext
+
+  if (!projectId) {
+    return {
+      code: 1001,
+      message: '缺少项目ID'
+    }
+  }
+
+  try {
+    await db.collection('projects')
+      .doc(projectId)
+      .update({
+        data: {
+          viewCount: _.inc(1),
+          lastViewedAt: new Date(),
+          lastViewedBy: OPENID || ''
+        }
+      })
+
+    return {
+      code: 0,
+      message: 'success',
+      data: null
+    }
+  } catch (error) {
+    logger.error('[project.viewProject] 更新浏览量失败', { projectId, error })
+    return {
+      code: 9999,
+      message: '浏览记录失败'
+    }
   }
 }
 
