@@ -155,15 +155,21 @@ const pendingEventId = ref('')
 const menuButtonInfo = ref({ top: 32, height: 32, bottom: 64 })
 const NAV_EXTRA_PADDING = 8
 const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/白色Logo.png')
+const shareTitle = '创业者-赋能社群'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
 const sharePath = '/pages/index/index'
 const { isAlive, safeRun } = useSafeAsync()
 
 useShare({
-  path: sharePath
+  title: shareTitle,
+  path: sharePath,
+  image: shareImage
 })
 
 defineExpose({
-  sharePath
+  shareTitle,
+  sharePath,
+  shareImage
 })
 const logoUrl = ref('')
 let loadEventsTaskId = 0

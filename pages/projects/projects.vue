@@ -85,17 +85,20 @@
           <skeleton v-if="loading && projectList.length === 0" type="card" :rows="3" />
           
           <!-- 项目卡片 -->
-          <project-card
+          <view
             v-for="project in projectList"
             :key="project._id"
-            :project="project"
-            :is-login="userStore.isLogin"
-            :action-type="isAdmin ? 'delete' : 'connect'"
             class="project-item"
-            @connect="handleConnect"
-            @authorize="handleConnectAuthorize"
-            @delete="handleAdminDelete"
-          />
+          >
+            <project-card
+              :project="project"
+              :is-login="userStore.isLogin"
+              :action-type="isAdmin ? 'delete' : 'connect'"
+              @connect="handleConnect"
+              @authorize="handleConnectAuthorize"
+              @delete="handleAdminDelete"
+            />
+          </view>
           
           <!-- 加载更多 -->
           <view v-if="loading && projectList.length > 0" class="loading-more">
@@ -149,22 +152,26 @@ import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { buildCloudFilePath } from '@/utils/cloud-storage'
 
 const projectStore = useProjectStore()
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
-const shareTitle = '项目广场 - Startupilot'
+const shareTitle = '创业者-赋能社群'
 const sharePath = '/pages/projects/projects'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/链接-分享.png')
 const { isAlive, safeRun } = useSafeAsync()
 
 useShare({
   title: shareTitle,
-  path: sharePath
+  path: sharePath,
+  image: shareImage
 })
 
 defineExpose({
   shareTitle,
-  sharePath
+  sharePath,
+  shareImage
 })
 
 const categories = [

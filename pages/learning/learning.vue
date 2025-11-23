@@ -61,16 +61,19 @@
             <skeleton v-if="loading && resourceList.length === 0" type="card" :rows="3" />
             
             <!-- 资源卡片 -->
-            <learning-card
+            <view
               v-for="resource in resourceList"
               :key="resource._id"
-              :resource="resource"
-              :is-login="userStore.isLogin"
               class="resource-item"
-              @view="handleViewResource"
-              @favorite="handleFavorite"
-              @authorize="handleResourceAuthorize"
-            />
+            >
+              <learning-card
+                :resource="resource"
+                :is-login="userStore.isLogin"
+                @view="handleViewResource"
+                @favorite="handleFavorite"
+                @authorize="handleResourceAuthorize"
+              />
+            </view>
             
             <!-- 加载更多 -->
             <view v-if="loading && resourceList.length > 0" class="loading-more">
@@ -116,20 +119,24 @@ import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { buildCloudFilePath } from '@/utils/cloud-storage'
 
 const userStore = useUserStore()
-const shareTitle = 'Founder Think - Startupilot'
+const shareTitle = '创业者-赋能社群'
 const sharePath = '/pages/learning/learning'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/智库-分享.png')
 const { isAlive, safeRun } = useSafeAsync()
 
 useShare({
   title: shareTitle,
-  path: sharePath
+  path: sharePath,
+  image: shareImage
 })
 
 defineExpose({
   shareTitle,
-  sharePath
+  sharePath,
+  shareImage
 })
 
 const tabs = [

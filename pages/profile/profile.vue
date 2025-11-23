@@ -182,6 +182,7 @@ import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
 import { buildCloudFilePath } from '@/utils/cloud-storage'
 import { logger } from '@/utils/logger'
+import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const userStore = useUserStore()
@@ -194,6 +195,9 @@ const defaultStats = {
 
 const showRedeemModal = ref(false)
 const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/白色Logo.png')
+const shareTitle = '创业者-赋能社群'
+const sharePath = '/pages/profile/profile'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
 const guestBgUrl = ref(buildCloudFilePath('profile/images/未登录用户.png'))
 const regularBgUrl = ref(buildCloudFilePath('profile/images/普通用户测试2.png'))
 const neoBgUrl = ref(buildCloudFilePath('profile/images/NEO会员测试2.png'))
@@ -206,6 +210,13 @@ const ensureNumber = (value, fallback) => (isValidNumber(value) ? value : fallba
 const toPx = (value, fallback) => `${ensureNumber(value, fallback)}px`
 const menuButtonInfo = ref({ ...DEFAULT_MENU_BUTTON_INFO })
 const { isAlive, safeRun } = useSafeAsync()
+
+useShare({
+  title: shareTitle,
+  path: sharePath,
+  image: shareImage
+})
+
 const initNavbarMetrics = () => {
   try {
     let info = null
