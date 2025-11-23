@@ -61,16 +61,19 @@
             <skeleton v-if="loading && resourceList.length === 0" type="card" :rows="3" />
             
             <!-- 资源卡片 -->
-            <learning-card
+            <view
               v-for="resource in resourceList"
               :key="resource._id"
-              :resource="resource"
-              :is-login="userStore.isLogin"
               class="resource-item"
-              @view="handleViewResource"
-              @favorite="handleFavorite"
-              @authorize="handleResourceAuthorize"
-            />
+            >
+              <learning-card
+                :resource="resource"
+                :is-login="userStore.isLogin"
+                @view="handleViewResource"
+                @favorite="handleFavorite"
+                @authorize="handleResourceAuthorize"
+              />
+            </view>
             
             <!-- 加载更多 -->
             <view v-if="loading && resourceList.length > 0" class="loading-more">
@@ -114,14 +117,26 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import Loading from '@/components/loading/loading.vue'
 import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { logger } from '@/utils/logger'
+import { useShare } from '@/composables/useShare'
+import { useSafeAsync } from '@/composables/useSafeAsync'
+import { buildCloudFilePath } from '@/utils/cloud-storage'
 
 const userStore = useUserStore()
-const shareTitle = 'Founder Think - Startupilot'
+const shareTitle = '创业者-赋能社群'
 const sharePath = '/pages/learning/learning'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/智库-分享.png')
+const { isAlive, safeRun } = useSafeAsync()
+
+useShare({
+  title: shareTitle,
+  path: sharePath,
+  image: shareImage
+})
 
 defineExpose({
   shareTitle,
-  sharePath
+  sharePath,
+  shareImage
 })
 
 const tabs = [
@@ -146,7 +161,6 @@ const windowInfo = ref({ windowWidth: 375 })
 const EXTRA_GAP = 12
 const SEARCH_DEBOUNCE_DELAY = 300
 let searchDebounceTimer = null
-let pageAlive = true
 let loadResourcesTaskId = 0
 
 const rightSafeWidth = computed(() => {
@@ -231,13 +245,11 @@ watch(currentTab, () => {
 
 // 加载资源列表
 const loadResources = async (refresh = false) => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   if (refresh) {
     page.value = 1
     hasMore.value = true
-    if (pageAlive) {
-      resourceList.value = []
-    }
+    resourceList.value = []
   }
   
   if (!hasMore.value || loading.value) return
@@ -255,7 +267,7 @@ const loadResources = async (refresh = false) => {
     
     const { list, total } = result
     
-    if (!pageAlive || taskId !== loadResourcesTaskId) {
+    if (!isAlive.value || taskId !== loadResourcesTaskId) {
       return
     }
 
@@ -270,7 +282,7 @@ const loadResources = async (refresh = false) => {
   } catch (error) {
     logger.error('[pages/learning] 加载资源失败', error)
   } finally {
-    if (pageAlive && taskId === loadResourcesTaskId) {
+    if (isAlive.value && taskId === loadResourcesTaskId) {
       loading.value = false
     }
   }
@@ -278,20 +290,20 @@ const loadResources = async (refresh = false) => {
 
 // 下拉刷新
 const onRefresh = async () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   refreshing.value = true
   try {
     await loadResources(true)
   } finally {
-    if (pageAlive) {
+    safeRun(() => {
       refreshing.value = false
-    }
+    })
   }
 }
 
 // 加载更多
 const loadMore = () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   if (!loading.value && hasMore.value) {
     loadResources()
   }
@@ -487,7 +499,7 @@ const onRedeemSuccess = () => {
 }
 
 const favoriteSyncHandler = ({ itemId, itemType, isFavorited }) => {
-  if (itemType !== 'learning' || !pageAlive) return
+  if (itemType !== 'learning' || !isAlive.value) return
   const target = resourceList.value.find(item => item._id === itemId)
   if (target) {
     target.isFavorited = isFavorited
@@ -512,7 +524,7 @@ const handleResourceAuthorize = async ({ resource, detail }) => {
     // 绑定手机号
     await userStore.bindPhone(cloudID)
 
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
 
@@ -533,7 +545,6 @@ const handleResourceAuthorize = async ({ resource, detail }) => {
 }
 
 onLoad(() => {
-  pageAlive = true
   initNavbarMetrics()
 })
 
@@ -548,7 +559,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  pageAlive = false
   uni.$off('favoriteChanged', favoriteSyncHandler)
 
   if (searchDebounceTimer) {
@@ -558,7 +568,6 @@ onUnmounted(() => {
 })
 
 onUnload(() => {
-  pageAlive = false
   uni.$off('favoriteChanged', favoriteSyncHandler)
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)

@@ -51,15 +51,21 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { onLoad, onUnload } from '@dcloudio/uni-app'
+import { onLoad } from '@dcloudio/uni-app'
 import { useProjectStore } from '@/store/project'
 import ProjectCard from '@/components/project-card/project-card.vue'
 import Loading from '@/components/loading/loading.vue'
 import { logger } from '@/utils/logger'
+import { useShare } from '@/composables/useShare'
+import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const disableShare = true
 defineExpose({
   disableShare
+})
+
+useShare({
+  disable: true
 })
 
 const projectStore = useProjectStore()
@@ -72,7 +78,7 @@ const NAV_EXTRA_PADDING = 12
 const DEFAULT_NAVBAR_HEIGHT = (DEFAULT_MENU_BUTTON_INFO.bottom || 64) + NAV_EXTRA_PADDING
 
 const menuButtonInfo = ref({ ...DEFAULT_MENU_BUTTON_INFO })
-let pageAlive = true
+const { isAlive } = useSafeAsync()
 
 const isValidNumber = (value) => typeof value === 'number' && !Number.isNaN(value)
 const toPx = (value, fallback) => `${isValidNumber(value) ? value : fallback}px`
@@ -110,7 +116,7 @@ const initNavbarMetrics = () => {
     } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
       info = uni.getMenuButtonBoundingClientRect()
     }
-    if (info && info.height && info.top !== undefined && pageAlive) {
+    if (info && info.height && info.top !== undefined && isAlive.value) {
       menuButtonInfo.value = {
         ...DEFAULT_MENU_BUTTON_INFO,
         ...info
@@ -183,13 +189,8 @@ const handleBack = () => {
 }
 
 onLoad(() => {
-  pageAlive = true
   initNavbarMetrics()
   fetchProjects(true)
-})
-
-onUnload(() => {
-  pageAlive = false
 })
 </script>
 

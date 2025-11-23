@@ -128,8 +128,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
-import { onLoad, onUnload } from '@dcloudio/uni-app'
+import { ref, onMounted, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useEventStore } from '@/store/event'
 import { useUserStore } from '@/store/user'
 import GlassCard from '@/components/glass-card/glass-card.vue'
@@ -142,6 +142,8 @@ import { TRACK_EVENTS } from '@/utils/constants'
 import { CLOUD_STORAGE, getTempFileURLs, getTempFileURL, buildCloudFilePath } from '@/utils/cloud-storage'
 import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
+import { useShare } from '@/composables/useShare'
+import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const eventStore = useEventStore()
 const userStore = useUserStore()
@@ -153,13 +155,23 @@ const pendingEventId = ref('')
 const menuButtonInfo = ref({ top: 32, height: 32, bottom: 64 })
 const NAV_EXTRA_PADDING = 8
 const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/白色Logo.png')
+const shareTitle = '创业者-赋能社群'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
 const sharePath = '/pages/index/index'
+const { isAlive, safeRun } = useSafeAsync()
+
+useShare({
+  title: shareTitle,
+  path: sharePath,
+  image: shareImage
+})
 
 defineExpose({
-  sharePath
+  shareTitle,
+  sharePath,
+  shareImage
 })
 const logoUrl = ref('')
-let pageAlive = true
 let loadEventsTaskId = 0
 
 const navHeight = computed(() => {
@@ -184,14 +196,6 @@ const logoRowStyle = computed(() => ({
 const pageContentStyle = computed(() => ({
   paddingTop: `${navHeight.value}px`
 }))
-
-onUnmounted(() => {
-  pageAlive = false
-})
-
-onUnload(() => {
-  pageAlive = false
-})
 
 // 活动列表
 const eventList = ref([])
@@ -264,7 +268,7 @@ const initLogo = async () => {
         fileList: [LOGO_CLOUD_PATH]
       })
       const tempFileURL = res.fileList?.[0]?.tempFileURL
-      if (tempFileURL && pageAlive) {
+      if (tempFileURL && isAlive.value) {
         logoUrl.value = tempFileURL
         return
       }
@@ -272,24 +276,24 @@ const initLogo = async () => {
   } catch (error) {
     logger.error('[pages/index] 加载Logo失败', error)
   }
-  if (pageAlive) {
+  safeRun(() => {
     logoUrl.value = LOGO_CLOUD_PATH
-  }
+  })
 }
 
 // 加载带样式的图片
 const loadStyledImages = async () => {
   try {
     const styledURLs = await getTempFileURLs(CLOUD_STORAGE.about, 'jianjin')
-    if (pageAlive) {
+    safeRun(() => {
       aboutImages.value = styledURLs
-    }
+    })
   } catch (error) {
     logger.error('[pages/index] 加载关于我们图片失败', error)
     // 失败时使用原始 URL
-    if (pageAlive) {
+    safeRun(() => {
       aboutImages.value = CLOUD_STORAGE.about
-    }
+    })
   }
 }
 
@@ -322,19 +326,19 @@ const syncBookingStatus = async (events = []) => {
     return
   }
 
-  if (!pageAlive) return
+  if (!isAlive.value) return
   bookingSyncing.value = true
   try {
     await eventStore.fetchMyBookings('confirmed')
   } catch (error) {
     logger.error('[pages/index] 获取预约状态失败', error)
   } finally {
-    if (pageAlive) {
+    safeRun(() => {
       bookingSyncing.value = false
-    }
+    })
   }
 
-  if (!pageAlive) return
+  if (!isAlive.value) return
   const bookedIds = new Set(eventStore.myBookings.map(item => item.eventId))
   events.forEach(event => {
     event.isBooked = bookedIds.has(event._id)
@@ -362,7 +366,7 @@ const faqList = ref([
 
 // 加载活动列表
 const loadEvents = async () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   const taskId = ++loadEventsTaskId
   loading.value = true
   let eventsToRender = []
@@ -382,7 +386,7 @@ const loadEvents = async () => {
     await syncBookingStatus(fallbackEvents)
     eventsToRender = fallbackEvents
   } finally {
-    if (!pageAlive || taskId !== loadEventsTaskId) {
+    if (!isAlive.value || taskId !== loadEventsTaskId) {
       return
     }
     eventList.value = eventsToRender
@@ -392,14 +396,14 @@ const loadEvents = async () => {
 
 // 下拉刷新
 const onRefresh = async () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   refreshing.value = true
   try {
     await loadEvents()
   } finally {
-    if (pageAlive) {
+    safeRun(() => {
       refreshing.value = false
-    }
+    })
   }
 }
 
@@ -442,7 +446,7 @@ const handleBookEvent = async (event) => {
     const success = await eventStore.bookEvent(event._id, event)
     
     // 更新本地状态
-    if (success && pageAlive) {
+    if (success && isAlive.value) {
       event.isBooked = true
     }
   } catch (error) {
@@ -466,16 +470,16 @@ const onFormSuccess = async () => {
       if (event) {
         await eventStore.bookEvent(pendingEventId.value, event)
         // 更新本地状态
-        if (pageAlive) {
+        safeRun(() => {
           event.isBooked = true
-        }
+        })
       }
     } catch (error) {
       logger.error('[pages/index] 表单提交后预约失败', error)
     }
-    if (pageAlive) {
+    safeRun(() => {
       pendingEventId.value = ''
-    }
+    })
   }
 }
 
@@ -494,7 +498,7 @@ const handleAuthorize = async ({ event, detail }) => {
     // 绑定手机号
     await userStore.bindPhone(cloudID)
 
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
 
@@ -534,7 +538,6 @@ const toggleFAQ = (index) => {
 }
 
 onLoad(() => {
-  pageAlive = true
   initNavbarMetrics()
   initLogo()
 })

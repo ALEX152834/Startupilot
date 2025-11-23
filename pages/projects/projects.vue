@@ -85,17 +85,20 @@
           <skeleton v-if="loading && projectList.length === 0" type="card" :rows="3" />
           
           <!-- 项目卡片 -->
-          <project-card
+          <view
             v-for="project in projectList"
             :key="project._id"
-            :project="project"
-            :is-login="userStore.isLogin"
-            :action-type="isAdmin ? 'delete' : 'connect'"
             class="project-item"
-            @connect="handleConnect"
-            @authorize="handleConnectAuthorize"
-            @delete="handleAdminDelete"
-          />
+          >
+            <project-card
+              :project="project"
+              :is-login="userStore.isLogin"
+              :action-type="isAdmin ? 'delete' : 'connect'"
+              @connect="handleConnect"
+              @authorize="handleConnectAuthorize"
+              @delete="handleAdminDelete"
+            />
+          </view>
           
           <!-- 加载更多 -->
           <view v-if="loading && projectList.length > 0" class="loading-more">
@@ -147,16 +150,28 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
 import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
+import { useShare } from '@/composables/useShare'
+import { useSafeAsync } from '@/composables/useSafeAsync'
+import { buildCloudFilePath } from '@/utils/cloud-storage'
 
 const projectStore = useProjectStore()
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
-const shareTitle = '项目广场 - Startupilot'
+const shareTitle = '创业者-赋能社群'
 const sharePath = '/pages/projects/projects'
+const shareImage = buildCloudFilePath('profile/分享的静态图片/链接-分享.png')
+const { isAlive, safeRun } = useSafeAsync()
+
+useShare({
+  title: shareTitle,
+  path: sharePath,
+  image: shareImage
+})
 
 defineExpose({
   shareTitle,
-  sharePath
+  sharePath,
+  shareImage
 })
 
 const categories = [
@@ -177,7 +192,6 @@ const EXTRA_GAP = 12
 const menuButtonInfo = ref({ height: 64, top: 32, left: 0 })
 const windowInfo = ref({ windowWidth: 375 })
 let searchDebounceTimer = null
-let pageAlive = true
 let loadProjectsTaskId = 0
 
 const showFormModal = ref(false)
@@ -315,10 +329,10 @@ const initNavbarMetrics = () => {
 
 // 加载项目列表
 const loadProjects = async (refresh = false) => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   logger.log('[pages/projects] loadProjects start', { refresh })
   
-  if (refresh && pageAlive) {
+  if (refresh) {
     hasMore.value = true
     projectList.value = []
   }
@@ -350,7 +364,7 @@ const loadProjects = async (refresh = false) => {
       ? uniqueProjects
       : uniqueProjects.filter(project => project.category === currentCategory.value)
     
-    if (pageAlive && taskId === loadProjectsTaskId) {
+    if (isAlive.value && taskId === loadProjectsTaskId) {
       projectList.value = filteredProjects.map(project => sanitizeProjectForPublic(project))
       hasMore.value = projectStore.hasMore
     }
@@ -358,7 +372,7 @@ const loadProjects = async (refresh = false) => {
   } catch (error) {
     logger.error('[pages/projects] 加载项目失败', error)
   } finally {
-    if (pageAlive && taskId === loadProjectsTaskId) {
+    if (isAlive.value && taskId === loadProjectsTaskId) {
       loading.value = false
     }
   }
@@ -366,20 +380,20 @@ const loadProjects = async (refresh = false) => {
 
 // 下拉刷新
 const onRefresh = async () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   refreshing.value = true
   try {
     await loadProjects(true)
   } finally {
-    if (pageAlive) {
+    safeRun(() => {
       refreshing.value = false
-    }
+    })
   }
 }
 
 // 加载更多
 const loadMore = () => {
-  if (!pageAlive) return
+  if (!isAlive.value) return
   if (!loading.value && hasMore.value) {
     loadProjects()
   }
@@ -451,7 +465,7 @@ const handlePublishAuthorize = async (event) => {
     // 绑定手机号
     await userStore.bindPhone(cloudID)
 
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
 
@@ -480,7 +494,7 @@ const handleConnectAuthorize = async ({ project, detail }) => {
     // 绑定手机号
     await userStore.bindPhone(cloudID)
 
-    if (!pageAlive) {
+    if (!isAlive.value) {
       return
     }
 
@@ -510,7 +524,7 @@ const handleAdminDelete = (project) => {
       if (res.confirm) {
         try {
           await projectStore.deleteProject(project._id)
-          if (!pageAlive) {
+          if (!isAlive.value) {
             releaseLock()
             return
           }
@@ -533,7 +547,6 @@ const handleAdminDelete = (project) => {
 }
 
 onLoad(() => {
-  pageAlive = true
   initNavbarMetrics()
 })
 
@@ -547,13 +560,12 @@ onMounted(() => {
 
 onShow(() => {
   // 页面显示时刷新数据（从发布页面返回时）
-  if (pageAlive) {
+  if (isAlive.value) {
     loadProjects(true)
   }
 })
 
 onUnmounted(() => {
-  pageAlive = false
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
@@ -561,7 +573,6 @@ onUnmounted(() => {
 })
 
 onUnload(() => {
-  pageAlive = false
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
