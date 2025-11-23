@@ -120,6 +120,7 @@ import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 import { buildCloudFilePath } from '@/utils/cloud-storage'
+import { useNavbar } from '@/composables/useNavbar'
 
 const userStore = useUserStore()
 const shareTitle = '创业者-赋能社群'
@@ -156,33 +157,25 @@ const pageSize = 10
 const showRedeemModal = ref(false)
 const pendingResource = ref(null)
 const reading = ref(false)
-const menuButtonInfo = ref({ height: 64, top: 32, left: 0 })
-const windowInfo = ref({ windowWidth: 375 })
 const EXTRA_GAP = 12
 const SEARCH_DEBOUNCE_DELAY = 300
 let searchDebounceTimer = null
 let loadResourcesTaskId = 0
-
-const rightSafeWidth = computed(() => {
-  const width = windowInfo.value?.windowWidth || 0
-  const left = menuButtonInfo.value?.left || width
-  const value = Math.max(0, width - left + EXTRA_GAP)
-  return value
+const {
+  navbarPaddingStyle,
+  navbarRowStyle,
+  buildSearchContainerStyle,
+  buildSearchBoxStyle,
+  refreshNavbarMetrics
+} = useNavbar({
+  defaultMenuButtonInfo: { height: 64, top: 32, left: 0 },
+  defaultWindowInfo: { windowWidth: 375 },
+  rightGap: EXTRA_GAP,
+  logPrefix: '[pages/learning]'
 })
-const searchRowHeight = computed(() => menuButtonInfo.value?.height || 64)
-const navbarStyle = computed(() => ({
-  paddingTop: `${menuButtonInfo.value?.top || 0}px`
-}))
-const navbarRowStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`
-}))
-const searchContainerStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`,
-  marginRight: `${rightSafeWidth.value}px`
-}))
-const searchBoxStyle = computed(() => ({
-  height: `${searchRowHeight.value}px`
-}))
+const navbarStyle = navbarPaddingStyle
+const searchContainerStyle = buildSearchContainerStyle()
+const searchBoxStyle = buildSearchBoxStyle()
 
 const heroTitle = computed(() => (
   currentTab.value === 'ceo' ? "Founders' Mindset" : "Founders' Thinking"
@@ -191,42 +184,6 @@ const heroTitle = computed(() => (
 const heroSubtitle = computed(() => (
   currentTab.value === 'ceo' ? 'Develop ourselves' : 'Direct ourselves'
 ))
-
-const initNavbarMetrics = () => {
-  try {
-    let info = null
-    if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
-      info = wx.getMenuButtonBoundingClientRect()
-    } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
-      info = uni.getMenuButtonBoundingClientRect()
-    }
-
-    if (info && info.height && info.top !== undefined) {
-      menuButtonInfo.value = info
-    }
-  } catch (error) {
-    logger.error('[pages/learning] 获取胶囊信息失败', error)
-  }
-
-  const getWindowInfo = () => {
-    if (typeof wx !== 'undefined' && typeof wx.getWindowInfo === 'function') {
-      return wx.getWindowInfo()
-    }
-    if (typeof uni !== 'undefined' && typeof uni.getWindowInfo === 'function') {
-      return uni.getWindowInfo()
-    }
-    return null
-  }
-
-  try {
-    const info = getWindowInfo()
-    if (info && info.windowWidth) {
-      windowInfo.value = info
-    }
-  } catch (error) {
-    logger.error('[pages/learning] 获取 window 信息失败', error)
-  }
-}
 
 // Tab切换
 const handleTabChange = (tab) => {
@@ -545,7 +502,7 @@ const handleResourceAuthorize = async ({ resource, detail }) => {
 }
 
 onLoad(() => {
-  initNavbarMetrics()
+  refreshNavbarMetrics()
 })
 
 onMounted(() => {

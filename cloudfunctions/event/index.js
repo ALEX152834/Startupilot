@@ -219,28 +219,34 @@ async function book(params, wxContext) {
     }
   })
 
-  // 只有云端活动才更新参与人数
+  // 只有云端活动才更新参与人数；与用户统计并行
+  const updates = []
   if (!isLocalEvent) {
-    await db.collection('events')
-      .doc(eventId)
-      .update({
-        data: {
-          currentParticipants: _.inc(1)
-        }
-      })
+    updates.push(
+      db.collection('events')
+        .doc(eventId)
+        .update({
+          data: {
+            currentParticipants: _.inc(1)
+          }
+        })
+    )
   }
 
-  // 更新用户统计
-  await db.collection('user_stats')
-    .where({
-      uid: user.uid
-    })
-    .update({
-      data: {
-        registrationsCount: _.inc(1),
-        updatedAt: new Date()
-      }
-    })
+  updates.push(
+    db.collection('user_stats')
+      .where({
+        uid: user.uid
+      })
+      .update({
+        data: {
+          registrationsCount: _.inc(1),
+          updatedAt: new Date()
+        }
+      })
+  )
+
+  await Promise.all(updates)
 
   return {
     code: 0,
@@ -270,39 +276,37 @@ async function cancelBooking(params, wxContext) {
 
   const uid = userResult.data[0]?.uid
 
-  // 更新预约状态
-  await db.collection('bookings')
-    .where({
-      uid: uid,
-      eventId: eventId
-    })
-    .update({
-      data: {
-        status: 'cancelled',
-        updatedAt: new Date()
-      }
-    })
-
-  // 更新活动参与人数
-  await db.collection('events')
-    .doc(eventId)
-    .update({
-      data: {
-        currentParticipants: _.inc(-1)
-      }
-    })
-
-  // 更新用户统计
-  await db.collection('user_stats')
-    .where({
-      uid: uid
-    })
-    .update({
-      data: {
-        registrationsCount: _.inc(-1),
-        updatedAt: new Date()
-      }
-    })
+  // 更新预约状态、活动参与人数、用户统计并行
+  await Promise.all([
+    db.collection('bookings')
+      .where({
+        uid: uid,
+        eventId: eventId
+      })
+      .update({
+        data: {
+          status: 'cancelled',
+          updatedAt: new Date()
+        }
+      }),
+    db.collection('events')
+      .doc(eventId)
+      .update({
+        data: {
+          currentParticipants: _.inc(-1)
+        }
+      }),
+    db.collection('user_stats')
+      .where({
+        uid: uid
+      })
+      .update({
+        data: {
+          registrationsCount: _.inc(-1),
+          updatedAt: new Date()
+        }
+      })
+  ])
 
   return {
     code: 0,

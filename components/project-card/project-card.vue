@@ -46,12 +46,6 @@
     
     <!-- 项目详情 -->
     <view class="project-card__content">
-      <!-- 项目名称 -->
-      <view v-if="project.projectName" class="project-field">
-        <text class="field-label">📋 项目名称:</text>
-        <text class="field-value">{{ project.projectName }}</text>
-      </view>
-
       <!-- 管理员可见：注册主体 -->
       <view v-if="adminView && project.registeredEntity" class="project-field project-field--private">
         <text class="field-label">🏢 注册主体:</text>
@@ -75,10 +69,10 @@
         </view>
       </view>
       
-      <!-- 一句话介绍 -->
-      <view v-if="project.oneLiner" class="project-field">
-        <text class="field-label">💡 一句话:</text>
-        <text class="field-value" :class="{ 'ellipsis-2': !isExpanded }">{{ project.oneLiner }}</text>
+      <!-- 项目说明 -->
+      <view v-if="project.description" class="project-field">
+        <text class="field-label">🎯 合作诉求:</text>
+        <text class="field-value" :class="{ 'ellipsis-3': !isExpanded }">{{ project.description }}</text>
       </view>
       
       <!-- 项目赛道 -->
@@ -95,45 +89,39 @@
       </view>
       
       <!-- 项目介绍 -->
-      <view v-if="project.introduction" class="project-field">
+      <view v-if="isExpanded && project.introduction" class="project-field">
         <text class="field-label">📝 项目介绍:</text>
-        <text class="field-value" :class="{ 'ellipsis-3': !isExpanded }">{{ project.introduction }}</text>
+        <text class="field-value">{{ project.introduction }}</text>
       </view>
       
       <!-- 核心竞争力 -->
-      <view v-if="project.coreCompetitiveness" class="project-field">
+      <view v-if="isExpanded && project.coreCompetitiveness" class="project-field">
         <text class="field-label">⚡ 核心竞争力:</text>
-        <text class="field-value" :class="{ 'ellipsis-2': !isExpanded }">{{ project.coreCompetitiveness }}</text>
-      </view>
-
-      <!-- 项目说明 -->
-      <view v-if="project.description" class="project-field">
-        <text class="field-label">🎯 合作诉求:</text>
-        <text class="field-value" :class="{ 'ellipsis-3': !isExpanded }">{{ project.description }}</text>
+        <text class="field-value">{{ project.coreCompetitiveness }}</text>
       </view>
 
       <!-- 核心产品 -->
-      <view v-if="project.coreProducts" class="project-field">
+      <view v-if="isExpanded && project.coreProducts" class="project-field">
         <text class="field-label">🧩 核心产品:</text>
-        <text class="field-value" :class="{ 'ellipsis-2': !isExpanded }">{{ project.coreProducts }}</text>
+        <text class="field-value">{{ project.coreProducts }}</text>
       </view>
 
       <!-- 最佳实践 -->
-      <view v-if="project.bestPractices" class="project-field">
+      <view v-if="isExpanded && project.bestPractices" class="project-field">
         <text class="field-label">🚀 里程碑:</text>
-        <text class="field-value" :class="{ 'ellipsis-2': !isExpanded }">{{ project.bestPractices }}</text>
+        <text class="field-value">{{ project.bestPractices }}</text>
       </view>
 
       <!-- 主营区域 -->
-      <view v-if="project.mainRegion" class="project-field">
+      <view v-if="isExpanded && project.mainRegion" class="project-field">
         <text class="field-label">📍 主营区域:</text>
         <text class="field-value">{{ project.mainRegion }}</text>
       </view>
 
       <!-- 更多信息 -->
-      <view v-if="project.moreInfo" class="project-field">
+      <view v-if="isExpanded && project.moreInfo" class="project-field">
         <text class="field-label">🧭 更多信息:</text>
-        <text class="field-value" :class="{ 'ellipsis-3': !isExpanded }">{{ project.moreInfo }}</text>
+        <text class="field-value">{{ project.moreInfo }}</text>
       </view>
     </view>
 

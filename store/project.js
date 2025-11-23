@@ -128,13 +128,11 @@ export const useProjectStore = defineStore('project', {
 
       try {
         // 先尝试从缓存读取（仅在非刷新时、且不包含私有数据时）
-        if (!includePrivate && !refresh && this.page === 1 && !this.searchKeyword && this.currentCategory === PROJECT_CATEGORIES.ALL) {
+        if (!includePrivate && this.page === 1 && !this.searchKeyword && this.currentCategory === PROJECT_CATEGORIES.ALL) {
           const cache = storage.getCache(STORAGE_KEYS.PROJECTS_CACHE)
           if (cache) {
             logger.log('[projectStore.fetchProjectList] 使用缓存数据', { count: cache.length })
             this.projectList = cache
-            this.loading = false
-            return
           }
         }
         

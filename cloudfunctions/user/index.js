@@ -7,6 +7,35 @@ cloud.init({
 })
 
 const db = cloud.database()
+const MSG_CHECK_SCENE = 2
+
+async function checkContentSafety(content, openid, logPrefix = '[user]') {
+  if (!content) return { ok: true }
+
+  try {
+    const msgCheck = await cloud.openapi.security.msgSecCheck({
+      content,
+      version: 2,
+      scene: MSG_CHECK_SCENE,
+      openid
+    })
+
+    if (msgCheck?.result?.suggest === 'pass') {
+      return { ok: true }
+    }
+
+    return {
+      ok: false,
+      message: '内容包含敏感信息'
+    }
+  } catch (error) {
+    logger.error(`${logPrefix} 内容安全校验失败`, error)
+    return {
+      ok: false,
+      message: '安全检测不通过'
+    }
+  }
+}
 
 exports.main = async (event, context) => {
   const { action, params } = event
@@ -46,10 +75,19 @@ async function updateName(params, wxContext) {
   const { OPENID } = wxContext
   const { newName } = params
 
-  if (!newName || newName.trim() === '') {
+  const trimmedName = (newName || '').trim()
+  if (!trimmedName) {
     return {
       code: 1001,
       message: '昵称不能为空'
+    }
+  }
+
+  const safeCheck = await checkContentSafety(trimmedName, OPENID, '[user.updateName]')
+  if (!safeCheck.ok) {
+    return {
+      code: 500,
+      message: safeCheck.message
     }
   }
 
@@ -59,7 +97,7 @@ async function updateName(params, wxContext) {
     })
     .update({
       data: {
-        name: newName,
+        name: trimmedName,
         updatedAt: new Date()
       }
     })
@@ -175,6 +213,14 @@ async function updateProfile(params = {}, wxContext) {
       }
     }
     updateData.name = trimmed
+
+    const safeCheck = await checkContentSafety(trimmed, OPENID, '[user.updateProfile.name]')
+    if (!safeCheck.ok) {
+      return {
+        code: 500,
+        message: safeCheck.message
+      }
+    }
   }
 
   if (typeof phone === 'string') {
@@ -204,6 +250,14 @@ async function updateProfile(params = {}, wxContext) {
         }
       }
       updateData.wechat = wechatValue
+
+      const safeCheck = await checkContentSafety(wechatValue, OPENID, '[user.updateProfile.wechat]')
+      if (!safeCheck.ok) {
+        return {
+          code: 500,
+          message: safeCheck.message
+        }
+      }
     } else {
       updateData.wechat = ''
     }
@@ -260,27 +314,24 @@ async function getStats(params, wxContext) {
   const uid = userResult.data[0].uid
 
   // 从实际数据库记录计算统计数据
-  // 1. 收藏数
-  const favoritesCount = await db.collection('favorites')
-    .where({
-      uid: uid
-    })
-    .count()
-
-  // 2. 发布数
-  const postsCount = await db.collection('projects')
-    .where({
-      publisherUid: uid
-    })
-    .count()
-
-  // 3. 报名数（只统计已确认的）
-  const registrationsCount = await db.collection('bookings')
-    .where({
-      uid: uid,
-      status: 'confirmed'
-    })
-    .count()
+  const [favoritesCount, postsCount, registrationsCount] = await Promise.all([
+    db.collection('favorites')
+      .where({
+        uid: uid
+      })
+      .count(),
+    db.collection('projects')
+      .where({
+        publisherUid: uid
+      })
+      .count(),
+    db.collection('bookings')
+      .where({
+        uid: uid,
+        status: 'confirmed'
+      })
+      .count()
+  ])
 
   // 确保数值不为负数
   const stats = {

@@ -1,8 +1,98 @@
 import { ERROR_CODES } from './constants'
 import { showError, withLoading } from './feedback'
 import { logger } from './logger'
+import storage from './storage'
 
 const DEFAULT_ERROR_MESSAGE = '请求失败'
+const DEFAULT_MAX_RETRY = 1 // 默认重试 1 次
+let authModalShowing = false
+
+const isTimeoutError = (error = {}) => {
+  const msg = error.errMsg || error.message || ''
+  return /timeout|超时/i.test(msg)
+}
+
+const shouldRetry = (error, attempt, maxRetry) => {
+  if (attempt >= maxRetry) return false
+  if (!error) return true
+
+  if (error.code && error.code === ERROR_CODES.SERVER_ERROR) return true
+  if (error.isNetworkError) return true
+  if (isTimeoutError(error)) return true
+
+  return false
+}
+
+const handleAuthExpired = (message = '登录已失效，请重新登录') => {
+  if (authModalShowing) return
+  authModalShowing = true
+
+  // 清理本地凭证并通知全局
+  storage.removeUserInfo()
+  try {
+    if (typeof uni !== 'undefined' && uni.$emit) {
+      uni.$emit('auth:expired')
+    }
+  } catch (error) {
+    logger.warn('[request] 触发 auth:expired 事件失败', error)
+  }
+
+  if (typeof uni !== 'undefined' && typeof uni.showModal === 'function') {
+    uni.showModal({
+      title: '登录失效',
+      content: message,
+      confirmText: '去登录',
+      cancelText: '稍后',
+      success: (res) => {
+        if (res.confirm && typeof uni.switchTab === 'function') {
+          uni.switchTab({
+            url: '/pages/profile/profile'
+          })
+        }
+      },
+      complete: () => {
+        authModalShowing = false
+      }
+    })
+  } else {
+    authModalShowing = false
+  }
+}
+
+const callOnce = (name, data = {}) => new Promise((resolve, reject) => {
+  // 检查云开发是否已初始化
+  if (typeof wx === 'undefined' || !wx.cloud) {
+    logger.warn('[request] 云开发未初始化')
+    reject(new Error('云开发未初始化'))
+    return
+  }
+
+  wx.cloud.callFunction({
+    name,
+    data,
+    success: (res) => {
+      const result = res?.result || {}
+      const code = typeof result.code === 'number' ? result.code : ERROR_CODES.SERVER_ERROR
+      const message = result.message || DEFAULT_ERROR_MESSAGE
+      
+      if (code === ERROR_CODES.SUCCESS) {
+        resolve(result.data)
+      } else {
+        const error = new Error(message)
+        error.code = code
+        logger.error(`[cloud] ${name} 返回错误`, result)
+        reject(error)
+      }
+    },
+    fail: (err) => {
+      logger.error(`[cloud] ${name} 调用失败`, err)
+      const error = new Error(err?.errMsg || '网络请求失败')
+      error.raw = err
+      error.isNetworkError = true
+      reject(error)
+    }
+  })
+})
 
 /**
  * 云函数调用封装
@@ -11,39 +101,49 @@ const DEFAULT_ERROR_MESSAGE = '请求失败'
  * @returns {Promise}
  */
 export function callCloudFunction(name, data = {}, options = {}) {
-  const executor = () => new Promise((resolve, reject) => {
-    // 检查云开发是否已初始化
-    if (typeof wx === 'undefined' || !wx.cloud) {
-      logger.warn('[request] 云开发未初始化')
-      showError('云开发未配置')
-      reject(new Error('云开发未初始化'))
-      return
+  const maxRetry = options.retry === false ? 0 : (typeof options.retryTimes === 'number' ? options.retryTimes : DEFAULT_MAX_RETRY)
+  const executor = async () => {
+    let attempt = 0
+    let lastError = null
+
+    while (attempt <= maxRetry) {
+      try {
+        const result = await callOnce(name, data)
+        return result
+      } catch (error) {
+        lastError = error
+
+        if (error?.code === ERROR_CODES.AUTH_ERROR) {
+          handleAuthExpired(error.message)
+          throw error
+        }
+
+        if (shouldRetry(error, attempt, maxRetry)) {
+          attempt += 1
+          logger.warn(`[cloud] ${name} 重试第 ${attempt} 次`, error)
+          continue
+        }
+
+        if (!options.muteError) {
+          showError(error?.message || DEFAULT_ERROR_MESSAGE)
+        } else {
+          logger.warn(`[cloud] ${name} 静默失败`, error)
+        }
+        if (options.muteError) {
+          return null
+        }
+        throw error
+      }
     }
 
-    wx.cloud.callFunction({
-      name,
-      data,
-      success: (res) => {
-        const result = res?.result || {}
-        const code = typeof result.code === 'number' ? result.code : ERROR_CODES.SERVER_ERROR
-        const message = result.message || DEFAULT_ERROR_MESSAGE
-        
-        if (code === ERROR_CODES.SUCCESS) {
-          resolve(result.data)
-        } else {
-          logger.error(`[cloud] ${name} 返回错误`, result)
-          showError(message)
-          reject(new Error(message))
-        }
-      },
-      fail: (err) => {
-        logger.error(`[cloud] ${name} 调用失败`, err)
-        
-        showError('网络请求失败')
-        reject(err)
-      }
-    })
-  })
+    if (!options.muteError) {
+      showError(lastError?.message || DEFAULT_ERROR_MESSAGE)
+    }
+    if (options.muteError) {
+      return null
+    }
+    throw lastError
+  }
 
   if (options.showLoading) {
     return withLoading(executor, {
@@ -160,6 +260,18 @@ export const projectApi = {
     return callCloudFunction('project', {
       action: 'getList',
       params
+    })
+  },
+
+  // 浏览项目（静默计数）
+  viewProject(projectId) {
+    if (!projectId) return Promise.resolve(null)
+    return callCloudFunction('project', {
+      action: 'viewProject',
+      params: { projectId }
+    }, {
+      retryTimes: 0,
+      muteError: true
     })
   },
   

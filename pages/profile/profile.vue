@@ -183,6 +183,7 @@ import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
 import { buildCloudFilePath } from '@/utils/cloud-storage'
 import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
+import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 
 const userStore = useUserStore()
@@ -194,7 +195,7 @@ const defaultStats = {
 }
 
 const showRedeemModal = ref(false)
-const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/白色Logo.png')
+const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/顶部白Logo.png')
 const shareTitle = '创业者-赋能社群'
 const sharePath = '/pages/profile/profile'
 const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
@@ -203,12 +204,17 @@ const regularBgUrl = ref(buildCloudFilePath('profile/images/普通用户测试2.
 const neoBgUrl = ref(buildCloudFilePath('profile/images/NEO会员测试2.png'))
 const logoUrl = ref('')
 const NAV_EXTRA_PADDING = 8
-const DEFAULT_MENU_BUTTON_INFO = { top: 32, height: 32, bottom: 64 }
-const DEFAULT_NAVBAR_HEIGHT = DEFAULT_MENU_BUTTON_INFO.bottom + NAV_EXTRA_PADDING
-const isValidNumber = (value) => typeof value === 'number' && !Number.isNaN(value)
-const ensureNumber = (value, fallback) => (isValidNumber(value) ? value : fallback)
-const toPx = (value, fallback) => `${ensureNumber(value, fallback)}px`
-const menuButtonInfo = ref({ ...DEFAULT_MENU_BUTTON_INFO })
+const {
+  navbarHeightStyle,
+  buildLogoRowStyle,
+  buildContentPaddingStyle,
+  refreshNavbarMetrics
+} = useNavbar({
+  defaultMenuButtonInfo: { top: 32, height: 32, left: 0, bottom: 64 },
+  extraPadding: NAV_EXTRA_PADDING,
+  enableWindowInfo: false,
+  logPrefix: '[pages/profile]'
+})
 const { isAlive, safeRun } = useSafeAsync()
 
 useShare({
@@ -216,25 +222,6 @@ useShare({
   path: sharePath,
   image: shareImage
 })
-
-const initNavbarMetrics = () => {
-  try {
-    let info = null
-    if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
-      info = wx.getMenuButtonBoundingClientRect()
-    } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
-      info = uni.getMenuButtonBoundingClientRect()
-    }
-    if (info && info.height && info.top !== undefined) {
-      menuButtonInfo.value = {
-        ...DEFAULT_MENU_BUTTON_INFO,
-        ...info
-      }
-    }
-  } catch (error) {
-    logger.error('[pages/profile] 获取胶囊信息失败', error)
-  }
-}
 
 const initLogo = async () => {
   if (logoUrl.value) return
@@ -256,28 +243,9 @@ const initLogo = async () => {
     logoUrl.value = LOGO_CLOUD_PATH
   })
 }
-const navHeight = computed(() => {
-  const info = menuButtonInfo.value || DEFAULT_MENU_BUTTON_INFO
-  if (isValidNumber(info.bottom)) {
-    return info.bottom + NAV_EXTRA_PADDING
-  }
-  const top = ensureNumber(info.top, DEFAULT_MENU_BUTTON_INFO.top)
-  const height = ensureNumber(info.height, DEFAULT_MENU_BUTTON_INFO.height)
-  return top + height + NAV_EXTRA_PADDING
-})
-
-const navbarStyle = computed(() => ({
-  height: toPx(navHeight.value, DEFAULT_NAVBAR_HEIGHT)
-}))
-
-const logoRowStyle = computed(() => ({
-  marginTop: toPx(menuButtonInfo.value?.top, DEFAULT_MENU_BUTTON_INFO.top),
-  height: toPx(menuButtonInfo.value?.height, DEFAULT_MENU_BUTTON_INFO.height)
-}))
-
-const pageContentStyle = computed(() => ({
-  paddingTop: toPx(navHeight.value + 12, DEFAULT_NAVBAR_HEIGHT + 12)
-}))
+const navbarStyle = navbarHeightStyle
+const logoRowStyle = buildLogoRowStyle()
+const pageContentStyle = buildContentPaddingStyle(12)
 
 // 计算属性
 const isLogin = computed(() => userStore.isLogin)
@@ -579,7 +547,7 @@ const onRedeemSuccess = () => {
 }
 
 onLoad(() => {
-  initNavbarMetrics()
+  refreshNavbarMetrics()
   initLogo()
 })
 

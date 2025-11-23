@@ -11,6 +11,15 @@ if (typeof process !== 'undefined' && process && process.env && process.env.VITE
 }
 // #endif
 
+const userStore = useUserStore()
+const handleAuthExpired = () => {
+  if (typeof userStore.forceLogoutSilently === 'function') {
+    userStore.forceLogoutSilently()
+  } else {
+    userStore.logout()
+  }
+}
+
 onLaunch(() => {
   logger.log('[App] Launch')
   
@@ -32,12 +41,16 @@ onLaunch(() => {
   }
   
   // 检查登录状态
-  const userStore = useUserStore()
   userStore.checkLogin()
   if (userStore.isLogin) {
     userStore.fetchStats().catch((error) => {
       logger.error('[App] 初始化统计数据失败', error)
     })
+  }
+
+  // 监听登录失效事件
+  if (typeof uni !== 'undefined' && uni.$on) {
+    uni.$on('auth:expired', handleAuthExpired)
   }
 })
 
