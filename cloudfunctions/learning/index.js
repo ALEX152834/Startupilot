@@ -95,16 +95,19 @@ async function getList(params, wxContext) {
         itemId: true
       })
       .get()
-    
+
     favoritedIds = favoritesResult.data.map(f => f.itemId)
   }
 
   // 添加权限和收藏状态
   const list = resourcesResult.data.map(resource => {
     const requiredVipLevel = normalizeVipLevel(resource.requiredVipLevel)
-    const canAccess = !user ? false : (
-      requiredVipLevel === 'regular' ||
-      (requiredVipLevel === 'neo' && user.vipLevel === 'neo' && new Date(user.vipExpiry) > new Date())
+    // Regular资源对所有用户可见，NEO资源需要会员权限
+    const canAccess = requiredVipLevel === 'regular' || (
+      user &&
+      requiredVipLevel === 'neo' &&
+      user.vipLevel === 'neo' &&
+      new Date(user.vipExpiry) > new Date()
     )
 
     return {

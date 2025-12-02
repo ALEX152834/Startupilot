@@ -106,7 +106,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { onLoad, onUnload } from '@dcloudio/uni-app'
+import { onLoad, onUnload, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { learningApi, favoriteApi } from '@/utils/request'
 import { checkVipPermission, trackEvent } from '@/utils/auth'
@@ -117,27 +117,31 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import Loading from '@/components/loading/loading.vue'
 import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { logger } from '@/utils/logger'
-import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
-import { buildCloudFilePath } from '@/utils/cloud-storage'
 import { useNavbar } from '@/composables/useNavbar'
+import { getSharePreset } from '@/utils/share-presets'
+import { getCdnUrl } from '@/utils/cloud-storage'
 
 const userStore = useUserStore()
-const shareTitle = '创业者-赋能社群'
-const sharePath = '/pages/learning/learning'
-const shareImage = buildCloudFilePath('profile/分享的静态图片/智库-分享.png')
+const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('learning')
+const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
 
-useShare({
-  title: shareTitle,
-  path: sharePath,
-  image: shareImage
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: shareTitle,
+    path: sharePath,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
-defineExpose({
-  shareTitle,
-  sharePath,
-  shareImage
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: shareTitle,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
 const tabs = [

@@ -24,6 +24,9 @@
               :style="{ backgroundImage: memberCardBgUrl ? `url(${memberCardBgUrl})` : 'none' }"
             ></view>
             
+            <!-- 闪光特效层 - 在wrapper级别 -->
+            <view v-if="isNeoMember" class="neo-card-shimmer"></view>
+            
             <!-- 内容层 -->
               <view 
                 class="member-card" 
@@ -35,7 +38,6 @@
                   'neo-card': isNeoMember
                 }"
               >
-                <view v-if="isNeoMember" class="neo-card-glow"></view>
               <!-- 统一的内层容器 -->
               <view class="member-card-inner">
                 <!-- 顶部标签行：所有状态都有这个DOM -->
@@ -172,7 +174,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { onLoad, onShow, onUnload } from '@dcloudio/uni-app'
+import { onLoad, onShow, onUnload, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/store/user'
 import { trackEvent } from '@/utils/auth'
@@ -180,11 +182,11 @@ import { TRACK_EVENTS } from '@/utils/constants'
 import GlassCard from '@/components/glass-card/glass-card.vue'
 import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
-import { buildCloudFilePath } from '@/utils/cloud-storage'
+import { getCdnUrl, CLOUD_STORAGE } from '@/utils/cloud-storage'
 import { logger } from '@/utils/logger'
-import { useShare } from '@/composables/useShare'
 import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { getSharePreset } from '@/utils/share-presets'
 
 const userStore = useUserStore()
 const { stats } = storeToRefs(userStore)
@@ -193,15 +195,19 @@ const defaultStats = {
   postsCount: 0,
   registrationsCount: 0
 }
+const STATS_REFRESH_THROTTLE = 15000
+const LOGO_CDN_URL = getCdnUrl('profile/分享的静态图片/顶部白Logo.png')
+const GUEST_BG_CDN_URL = getCdnUrl('profile/images/未登录用户.png')
+const REGULAR_BG_CDN_URL = getCdnUrl('profile/images/普通用户测试2.png')
+const NEO_BG_CDN_URL = getCdnUrl('profile/images/NEO会员测试2.png')
+let lastRefreshTime = 0
 
 const showRedeemModal = ref(false)
-const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/顶部白Logo.png')
-const shareTitle = '创业者-赋能社群'
-const sharePath = '/pages/profile/profile'
-const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
-const guestBgUrl = ref(buildCloudFilePath('profile/images/未登录用户.png'))
-const regularBgUrl = ref(buildCloudFilePath('profile/images/普通用户测试2.png'))
-const neoBgUrl = ref(buildCloudFilePath('profile/images/NEO会员测试2.png'))
+const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('profile')
+const SHARE_CDN_IMAGE = shareImage
+const guestBgUrl = ref(GUEST_BG_CDN_URL)
+const regularBgUrl = ref(REGULAR_BG_CDN_URL)
+const neoBgUrl = ref(NEO_BG_CDN_URL)
 const logoUrl = ref('')
 const NAV_EXTRA_PADDING = 8
 const {
@@ -217,31 +223,26 @@ const {
 })
 const { isAlive, safeRun } = useSafeAsync()
 
-useShare({
-  title: shareTitle,
-  path: sharePath,
-  image: shareImage
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: shareTitle,
+    path: sharePath,
+    imageUrl: SHARE_CDN_IMAGE
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: shareTitle,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
 const initLogo = async () => {
   if (logoUrl.value) return
-  try {
-    if (typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.getTempFileURL === 'function') {
-      const res = await wx.cloud.getTempFileURL({
-        fileList: [LOGO_CLOUD_PATH]
-      })
-      const tempFileURL = res.fileList?.[0]?.tempFileURL
-      if (tempFileURL && isAlive.value) {
-        logoUrl.value = tempFileURL
-        return
-      }
-    }
-  } catch (error) {
-    logger.error('[pages/profile] 加载Logo失败', error)
-  }
-  safeRun(() => {
-    logoUrl.value = LOGO_CLOUD_PATH
-  })
+  logoUrl.value = LOGO_CDN_URL
 }
 const navbarStyle = navbarHeightStyle
 const logoRowStyle = buildLogoRowStyle()
@@ -262,9 +263,6 @@ const memberCardBgUrl = computed(() => {
   return guestBgUrl.value
 })
 
-
-// 导入云存储配置
-import { CLOUD_STORAGE, getTempFileURL } from '@/utils/cloud-storage'
 
 // 是否为管理员
 const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
@@ -300,41 +298,24 @@ const menuList = computed(() => {
 
 // 加载带样式的图标
 const loadStyledIcons = async () => {
-  try {
-    const icons = await Promise.all([
-      getTempFileURL(CLOUD_STORAGE.profile.favorites, 'jianjin'),
-      getTempFileURL(CLOUD_STORAGE.profile.posts, 'jianjin'),
-      getTempFileURL(CLOUD_STORAGE.profile.registrations, 'jianjin'),
-      getTempFileURL(CLOUD_STORAGE.profile.contact, 'jianjin'),
-      getTempFileURL(CLOUD_STORAGE.profile.settings, 'jianjin'),
-      getTempFileURL(CLOUD_STORAGE.profile.logout, 'jianjin')
-    ])
-    if (!isAlive.value) {
-      return
-    }
-    
-    // 更新基础菜单的图标
-    baseMenuList.value.forEach((item, index) => {
-      item.icon = icons[index]
-    })
-    
-    // 管理员菜单使用默认图标（可以后续添加专门的图标）
-    adminMenuList.value.forEach(item => {
-      item.icon = icons[0] // 暂时使用收藏图标
-    })
-  } catch (error) {
-    logger.error('[pages/profile] 加载图标失败', error)
-    // 失败时使用原始 URL
-    if (!isAlive.value) {
-      return
-    }
-    baseMenuList.value[0].icon = CLOUD_STORAGE.profile.favorites
-    baseMenuList.value[1].icon = CLOUD_STORAGE.profile.posts
-    baseMenuList.value[2].icon = CLOUD_STORAGE.profile.registrations
-    baseMenuList.value[3].icon = CLOUD_STORAGE.profile.contact
-    baseMenuList.value[4].icon = CLOUD_STORAGE.profile.settings
-    baseMenuList.value[5].icon = CLOUD_STORAGE.profile.logout
-  }
+  const icons = [
+    CLOUD_STORAGE.profile.favorites,
+    CLOUD_STORAGE.profile.posts,
+    CLOUD_STORAGE.profile.registrations,
+    CLOUD_STORAGE.profile.contact,
+    CLOUD_STORAGE.profile.settings,
+    CLOUD_STORAGE.profile.logout
+  ].map(getCdnUrl)
+
+  // 更新基础菜单的图标
+  baseMenuList.value.forEach((item, index) => {
+    item.icon = icons[index]
+  })
+
+  // 管理员菜单使用默认图标（可以后续添加专门的图标）
+  adminMenuList.value.forEach(item => {
+    item.icon = icons[0] // 暂时使用收藏图标
+  })
 }
 
 // 格式化日期
@@ -352,6 +333,7 @@ const loadStats = async () => {
   if (!userStore.isLogin) {
     userStore.$patch({ stats: { ...defaultStats } })
     logger.log('[pages/profile] 未登录，使用默认统计', stats.value)
+    lastRefreshTime = Date.now()
     return
   }
   
@@ -365,6 +347,8 @@ const loadStats = async () => {
     safeRun(() => {
       userStore.$patch({ stats: { ...defaultStats } })
     })
+  } finally {
+    lastRefreshTime = Date.now()
   }
 }
 
@@ -558,31 +542,10 @@ onMounted(async () => {
   // 数据埋点
   trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'profile' })
   
-  // 加载图片资源
-  try {
-    const res = await wx.cloud.getTempFileURL({
-      fileList: [
-        buildCloudFilePath('profile/images/未登录用户.png'),
-        buildCloudFilePath('profile/images/普通用户测试2.png'),
-        buildCloudFilePath('profile/images/NEO会员测试2.png')
-      ]
-    })
-    const fileList = (res && res.fileList) || []
-    if (!isAlive.value) {
-      return
-    }
-    if (fileList[0] && fileList[0].tempFileURL) {
-      guestBgUrl.value = fileList[0].tempFileURL
-    }
-    if (fileList[1] && fileList[1].tempFileURL) {
-      regularBgUrl.value = fileList[1].tempFileURL
-    }
-    if (fileList[2] && fileList[2].tempFileURL) {
-      neoBgUrl.value = fileList[2].tempFileURL
-    }
-  } catch (error) {
-    logger.error('[pages/profile] 加载图片资源失败', error)
-  }
+  // 加载图片资源（静态图直接走 CDN）
+  guestBgUrl.value = GUEST_BG_CDN_URL
+  regularBgUrl.value = REGULAR_BG_CDN_URL
+  neoBgUrl.value = NEO_BG_CDN_URL
   
   // 加载带样式的图标
   loadStyledIcons()
@@ -591,12 +554,10 @@ onMounted(async () => {
   loadStats()
 })
 
-// 使用一个标记来避免频繁刷新
-let lastRefreshTime = 0
 onShow(() => {
   const now = Date.now()
-  // 如果距离上次刷新超过3秒，才重新加载
-  if (now - lastRefreshTime > 3000) {
+  // 如果距离上次刷新超过阈值，才重新加载
+  if (now - lastRefreshTime > STATS_REFRESH_THROTTLE) {
     logger.log('[pages/profile] onShow 刷新统计数据')
     loadStats()
     lastRefreshTime = now
@@ -1221,6 +1182,35 @@ onUnload(() => {
 @keyframes neoGlow {
   0%, 100% { opacity: 0; }
   50%      { opacity: 1; }
+}
+
+// NEO会员卡闪光特效 - wrapper级别
+.neo-card-shimmer {
+  position: absolute;
+  top: -100%;
+  left: -200%;
+  width: 300%;
+  height: 300%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0) 70%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmerDiagonal 2s infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes shimmerDiagonal {
+  0% {
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    transform: translate(50%, 50%);
+  }
 }
 
 .profile-menu {
