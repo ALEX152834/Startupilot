@@ -180,6 +180,7 @@ import { computed, ref, watch, toRef } from 'vue'
 import GlassCard from '@/components/glass-card/glass-card.vue'
 import GlassButton from '@/components/glass-button/glass-button.vue'
 import { logger } from '@/utils/logger'
+import { getTempFileURL } from '@/utils/cloud-storage'
 
 const props = defineProps({
   project: {
@@ -276,19 +277,13 @@ const resolveProjectLogo = async () => {
   }
 
   if (logo.startsWith('cloud://')) {
-    if (typeof wx !== 'undefined' && wx.cloud?.getTempFileURL) {
-      try {
-        const res = await wx.cloud.getTempFileURL({
-          fileList: [logo]
-        })
-        if (logoResolveId === currentId) {
-          projectLogoUrl.value = res?.fileList?.[0]?.tempFileURL || ''
-        }
-      } catch (error) {
-        logger.error('[project-card] 加载项目Logo失败', error)
-        projectLogoUrl.value = ''
+    try {
+      const tempUrl = await getTempFileURL(logo, null)
+      if (logoResolveId === currentId) {
+        projectLogoUrl.value = tempUrl || ''
       }
-    } else {
+    } catch (error) {
+      logger.error('[project-card] 加载项目Logo失败', error)
       projectLogoUrl.value = ''
     }
     return
@@ -634,7 +629,7 @@ const handleCopyUid = () => {
       padding: 0 32rpx;
       border-radius: $radius-full;
       border: none;
-      background: linear-gradient(90deg, #3B82F6, #9333EA);
+      background: linear-gradient(90deg, #3B82F6, #9333EA, #EC4899);
       color: #fff;
       font-size: $font-sm;
       font-weight: 600;

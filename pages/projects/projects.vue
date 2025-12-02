@@ -138,7 +138,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { onLoad, onShow, onUnload } from '@dcloudio/uni-app'
+import { onLoad, onShow, onUnload, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { useProjectStore, sanitizeProjectForPublic } from '@/store/project'
 import { useUserStore } from '@/store/user'
 import { trackEvent } from '@/utils/auth'
@@ -151,30 +151,34 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import { openEnterpriseCustomerService } from '@/utils/customer-service-config'
 import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
-import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
-import { buildCloudFilePath } from '@/utils/cloud-storage'
 import { useNavbar } from '@/composables/useNavbar'
 import { projectApi } from '@/utils/request'
+import { getSharePreset } from '@/utils/share-presets'
+import { getCdnUrl } from '@/utils/cloud-storage'
 
 const projectStore = useProjectStore()
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
-const shareTitle = '创业者-赋能社群'
-const sharePath = '/pages/projects/projects'
-const shareImage = buildCloudFilePath('profile/分享的静态图片/链接-分享.png')
+const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('projects')
+const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
 
-useShare({
-  title: shareTitle,
-  path: sharePath,
-  image: shareImage
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: shareTitle,
+    path: sharePath,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
-defineExpose({
-  shareTitle,
-  sharePath,
-  shareImage
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: shareTitle,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
 const categories = [
@@ -190,6 +194,8 @@ const loading = ref(false)
 const refreshing = ref(false)
 const projectList = ref([])
 const hasMore = ref(true)
+const lastProjectsFetchedAt = ref(0)
+const PROJECTS_REFRESH_THROTTLE = 8000
 const SEARCH_DEBOUNCE_DELAY = 300
 const EXTRA_GAP = 12
 const {
@@ -208,6 +214,7 @@ const {
 let searchDebounceTimer = null
 let loadProjectsTaskId = 0
 const viewedProjectIds = new Set()
+let hasTriggeredInitialLoad = false
 
 const showFormModal = ref(false)
 const adminDeleteLock = ref(false)
@@ -329,6 +336,7 @@ const loadProjects = async (refresh = false) => {
     if (isAlive.value && taskId === loadProjectsTaskId) {
       projectList.value = filteredProjects.map(project => sanitizeProjectForPublic(project))
       hasMore.value = projectStore.hasMore
+      lastProjectsFetchedAt.value = Date.now()
     }
     logger.log('[pages/projects] loadProjects 完成', { length: projectList.value.length })
   } catch (error) {
@@ -389,6 +397,12 @@ const handleEmptyAuthorize = (detail) => {
     type: 'getphonenumber',
     detail
   })
+}
+
+const triggerInitialLoad = () => {
+  if (hasTriggeredInitialLoad) return
+  hasTriggeredInitialLoad = true
+  loadProjects(true)
 }
 
 const handleConnect = (project) => {
@@ -517,14 +531,24 @@ onMounted(() => {
   trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'projects' })
   
   // 加载数据
-  loadProjects(true)
+  triggerInitialLoad()
 })
 
 onShow(() => {
   // 页面显示时刷新数据（从发布页面返回时）
-  if (isAlive.value) {
-    loadProjects(true)
+  if (!hasTriggeredInitialLoad) {
+    triggerInitialLoad()
+    return
   }
+  if (!isAlive.value) return
+  const now = Date.now()
+  if (now - lastProjectsFetchedAt.value < PROJECTS_REFRESH_THROTTLE) {
+    logger.log('[pages/projects] onShow skip refresh, use cached list', {
+      delta: now - lastProjectsFetchedAt.value
+    })
+    return
+  }
+  loadProjects(true)
 })
 
 onUnmounted(() => {

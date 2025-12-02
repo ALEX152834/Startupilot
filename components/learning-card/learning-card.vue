@@ -405,7 +405,7 @@ const handleAuthorize = (e) => {
     height: 88rpx;
     border-radius: $radius-full;
     border: none;
-    background: linear-gradient(90deg, #3B82F6, #9333EA);
+    background: linear-gradient(90deg, #3B82F6, #9333EA, #EC4899);
     color: #fff;
     font-size: $font-base;
     font-weight: 600;

@@ -80,7 +80,7 @@ const handleTap = (e) => {
   outline: none;
   background: none;
   padding: 0;
-  border-radius: $radius-md;
+  border-radius: $radius-full;
   font-size: $font-base;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -111,7 +111,7 @@ const handleTap = (e) => {
   &--small {
     padding: 16rpx 32rpx;
     font-size: $font-sm;
-    border-radius: $radius-sm;
+    border-radius: $radius-full;
   }
   
   &--medium {

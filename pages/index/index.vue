@@ -129,7 +129,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { useEventStore } from '@/store/event'
 import { useUserStore } from '@/store/user'
 import GlassCard from '@/components/glass-card/glass-card.vue'
@@ -139,12 +139,12 @@ import EmptyState from '@/components/empty-state/empty-state.vue'
 import FormModal from '@/components/modals/form-modal.vue'
 import { trackEvent } from '@/utils/auth'
 import { TRACK_EVENTS } from '@/utils/constants'
-import { CLOUD_STORAGE, getTempFileURLs, buildCloudFilePath } from '@/utils/cloud-storage'
+import { CLOUD_STORAGE, buildCloudFilePath, getCdnUrl } from '@/utils/cloud-storage'
 import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
-import { useShare } from '@/composables/useShare'
 import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { getSharePreset } from '@/utils/share-presets'
 
 const eventStore = useEventStore()
 const userStore = useUserStore()
@@ -155,9 +155,9 @@ const showFormModal = ref(false)
 const pendingEventId = ref('')
 const NAV_EXTRA_PADDING = 8
 const LOGO_CLOUD_PATH = buildCloudFilePath('profile/分享的静态图片/顶部白Logo.png')
-const shareTitle = '创业者-赋能社群'
-const shareImage = buildCloudFilePath('profile/分享的静态图片/开始和我-分享.png')
-const sharePath = '/pages/index/index'
+const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('index')
+const LOGO_CDN_URL = getCdnUrl(LOGO_CLOUD_PATH)
+const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
 const {
   navbarHeightStyle,
@@ -171,16 +171,21 @@ const {
   logPrefix: '[pages/index]'
 })
 
-useShare({
-  title: shareTitle,
-  path: sharePath,
-  image: shareImage
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: shareTitle,
+    path: sharePath,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 
-defineExpose({
-  shareTitle,
-  sharePath,
-  shareImage
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: shareTitle,
+    imageUrl: SHARE_CDN_IMAGE
+  }
 })
 const logoUrl = ref('')
 let loadEventsTaskId = 0
@@ -202,7 +207,7 @@ const localEvents = [
     time: '14:00-16:00',
     type: 'online',
     location: '线上直播',
-    image: buildCloudFilePath('profile/活动/Bella Ren.png'),
+    image: getCdnUrl('profile/活动/Bella Ren.png'),
     description: '创业经验分享与交流',
     isBooked: false
   },
@@ -214,7 +219,7 @@ const localEvents = [
     time: '15:00-17:00',
     type: 'offline',
     location: '北京创业大街',
-    image: buildCloudFilePath('profile/活动/Phoebe.png'),
+    image: getCdnUrl('profile/活动/Phoebe.png'),
     description: '产品设计思维与实践',
     isBooked: false
   },
@@ -226,7 +231,7 @@ const localEvents = [
     time: '10:00-12:00',
     type: 'offline',
     location: '上海张江',
-    image: buildCloudFilePath('profile/活动/Luna.png'),
+    image: getCdnUrl('profile/活动/Luna.png'),
     description: '投资人面对面交流',
     isBooked: false
   }
@@ -235,57 +240,21 @@ const localEvents = [
 // 云存储图片 - 关于我们（带 jianjin 样式）
 const aboutImages = ref([])
 
-const initLogo = async () => {
+const initLogo = () => {
   if (logoUrl.value) return
-  try {
-    if (typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.getTempFileURL === 'function') {
-      const res = await wx.cloud.getTempFileURL({
-        fileList: [LOGO_CLOUD_PATH]
-      })
-      const tempFileURL = res.fileList?.[0]?.tempFileURL
-      if (tempFileURL && isAlive.value) {
-        logoUrl.value = tempFileURL
-        return
-      }
-    }
-  } catch (error) {
-    logger.error('[pages/index] 加载Logo失败', error)
-  }
-  safeRun(() => {
-    logoUrl.value = LOGO_CLOUD_PATH
-  })
+  logoUrl.value = LOGO_CDN_URL
 }
 
 // 加载带样式的图片
-const loadStyledImages = async () => {
-  try {
-    const styledURLs = await getTempFileURLs(CLOUD_STORAGE.about, 'jianjin')
-    safeRun(() => {
-      aboutImages.value = styledURLs
-    })
-  } catch (error) {
-    logger.error('[pages/index] 加载关于我们图片失败', error)
-    // 失败时使用原始 URL
-    safeRun(() => {
-      aboutImages.value = CLOUD_STORAGE.about
-    })
-  }
+const loadStyledImages = () => {
+  safeRun(() => {
+    aboutImages.value = CLOUD_STORAGE.about.map(getCdnUrl)
+  })
 }
 
 // 加载带样式的活动图片
 const loadStyledEventImages = async () => {
-  try {
-    const fileIds = localEvents.map(event => event.image)
-    const styledImages = await getTempFileURLs(fileIds, 'jianjin')
-    const styledEvents = localEvents.map((event, index) => ({
-      ...event,
-      image: styledImages?.[index] || event.image
-    }))
-    return styledEvents
-  } catch (error) {
-    logger.error('[pages/index] 加载活动图片失败', error)
-    return localEvents.map(event => ({ ...event }))
-  }
+  return localEvents.map(event => ({ ...event, image: getCdnUrl(event.image) }))
 }
 
 // 根据预约记录同步活动状态
