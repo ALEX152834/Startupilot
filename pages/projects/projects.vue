@@ -153,9 +153,11 @@ import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 import { useNavbar } from '@/composables/useNavbar'
+import { useHarmony } from '@/composables/useHarmony'
 import { projectApi } from '@/utils/request'
 import { getSharePreset } from '@/utils/share-presets'
 import { getCdnUrl } from '@/utils/cloud-storage'
+import { deferLoad } from '@/utils/performance'
 
 const projectStore = useProjectStore()
 const userStore = useUserStore()
@@ -163,6 +165,7 @@ const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('projects')
 const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
+const { isHarmony, bottomSafeAreaStyle } = useHarmony()
 
 // 分享给好友
 onShareAppMessage(() => {
@@ -527,8 +530,8 @@ onLoad(() => {
 })
 
 onMounted(() => {
-  // 数据埋点
-  trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'projects' })
+  // 数据埋点 - 延迟执行
+  deferLoad(() => trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'projects' }), 500)
   
   // 加载数据
   triggerInitialLoad()
@@ -679,13 +682,14 @@ onUnload(() => {
 }
 
 .fs-publish-native {
-  min-width: 220rpx;
-  height: 88rpx;
+  min-width: 176rpx;
+  height: 70rpx;
   border-radius: 999rpx;
-  padding: 0 32rpx;
+  padding: 0 26rpx;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
+  font-size: 26rpx;
 }
 
 .fs-publish-native {

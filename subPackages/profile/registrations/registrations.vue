@@ -13,8 +13,11 @@
         >
           <view class="booking-header">
             <text class="event-title">{{ booking.eventTitle }}</text>
-            <view class="status-badge" :class="'status-badge--' + booking.status">
-              {{ getStatusText(booking.status) }}
+            <view class="status-badge" :class="[
+              'status-badge--' + booking.status,
+              { 'status-badge--expired': isEventExpired(booking) }
+            ]">
+              {{ getStatusText(booking) }}
             </view>
           </view>
           
@@ -89,13 +92,48 @@ const loadBookings = async () => {
   }
 }
 
-const getStatusText = (status) => {
+// 检查活动是否已过期
+const isEventExpired = (booking) => {
+  // 如果没有日期字段，视为未过期
+  if (!booking || !booking.date) {
+    return false
+  }
+  
+  try {
+    // 解析活动日期
+    const eventDate = new Date(booking.date)
+    
+    // 获取当前日期并设置为午夜（00:00:00）
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    // 比较日期
+    return eventDate < today
+  } catch (error) {
+    // 日期解析失败，视为未过期
+    logger.error('[registrations] 日期解析失败', error)
+    return false
+  }
+}
+
+const getStatusText = (booking) => {
+  // 优先检查取消状态
+  if (booking.status === 'cancelled') {
+    return '已取消'
+  }
+  
+  // 检查是否过期
+  if (isEventExpired(booking)) {
+    return '已过期'
+  }
+  
+  // 返回其他状态
   const statusMap = {
     pending: '待确认',
     confirmed: '已确认',
-    cancelled: '已取消'
+    completed: '已完成'
   }
-  return statusMap[status] || status
+  return statusMap[booking.status] || booking.status
 }
 
 const handleCancel = (booking) => {
@@ -212,6 +250,11 @@ onMounted(() => {
       &--cancelled {
         background: rgba(0, 0, 0, 0.05);
         color: $text-tertiary;
+      }
+      
+      &--expired {
+        background: rgba(239, 68, 68, 0.1);
+        color: #EF4444;
       }
     }
   }

@@ -186,7 +186,9 @@ import { getCdnUrl, CLOUD_STORAGE } from '@/utils/cloud-storage'
 import { logger } from '@/utils/logger'
 import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { useHarmony } from '@/composables/useHarmony'
 import { getSharePreset } from '@/utils/share-presets'
+import { deferLoad } from '@/utils/performance'
 
 const userStore = useUserStore()
 const { stats } = storeToRefs(userStore)
@@ -222,6 +224,7 @@ const {
   logPrefix: '[pages/profile]'
 })
 const { isAlive, safeRun } = useSafeAsync()
+const { isHarmony, bottomSafeAreaStyle } = useHarmony()
 
 // 分享给好友
 onShareAppMessage(() => {
@@ -279,10 +282,10 @@ const baseMenuList = ref([
 
 // 管理员菜单
 const adminMenuList = ref([
-  { id: 'admin-projects', icon: '', text: '项目管理', url: '/pages/admin/projects-admin' },
-  { id: 'admin-codes', icon: '', text: '兑换码管理', url: '/pages/admin/redeem-codes' },
-  { id: 'admin-bookings', icon: '', text: '预约管理', url: '/pages/admin/bookings' },
-  { id: 'admin-publish-permissions', icon: '', text: '发布权限管理', url: '/pages/admin/publish-permissions' }
+  { id: 'admin-projects', icon: '', text: '项目管理', url: '/subPackages/admin/projects-admin' },
+  { id: 'admin-codes', icon: '', text: '兑换码管理', url: '/subPackages/admin/redeem-codes' },
+  { id: 'admin-bookings', icon: '', text: '预约管理', url: '/subPackages/admin/bookings' },
+  { id: 'admin-publish-permissions', icon: '', text: '发布权限管理', url: '/subPackages/admin/publish-permissions' }
 ])
 
 // 动态菜单列表
@@ -539,16 +542,16 @@ onMounted(async () => {
   // 检查登录状态
   userStore.checkLogin()
   
-  // 数据埋点
-  trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'profile' })
+  // 数据埋点 - 延迟执行
+  deferLoad(() => trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'profile' }), 500)
   
   // 加载图片资源（静态图直接走 CDN）
   guestBgUrl.value = GUEST_BG_CDN_URL
   regularBgUrl.value = REGULAR_BG_CDN_URL
   neoBgUrl.value = NEO_BG_CDN_URL
   
-  // 加载带样式的图标
-  loadStyledIcons()
+  // 延迟加载非关键资源
+  deferLoad(() => loadStyledIcons(), 200)
   
   // 加载统计
   loadStats()

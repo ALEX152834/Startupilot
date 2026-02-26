@@ -57,8 +57,16 @@ async function getList(params, wxContext) {
 
   const uid = userResult.data[0]?.uid
 
-  // 构建查询条件
-  const query = {}
+  // 获取当天日期字符串（格式：YYYY-MM-DD），用于过滤已过期活动
+  const today = new Date()
+  const todayStr = today.getFullYear() + '-' + 
+    String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(today.getDate()).padStart(2, '0')
+
+  // 构建查询条件：只查询今天及以后的活动（date 字段为字符串格式）
+  const query = {
+    date: _.gte(todayStr)
+  }
   if (status !== 'all') {
     query.status = status
   }
@@ -70,7 +78,7 @@ async function getList(params, wxContext) {
 
   const eventsResult = await db.collection('events')
     .where(query)
-    .orderBy('date', 'desc')
+    .orderBy('date', 'asc')
     .skip((page - 1) * pageSize)
     .limit(pageSize)
     .get()

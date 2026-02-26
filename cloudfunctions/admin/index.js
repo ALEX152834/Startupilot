@@ -189,7 +189,8 @@ async function getAllBookings(params, wxContext) {
       userName: booking.userName || user.name,
       userPhone: booking.userPhone || user.phone,
       userWechat: booking.userWechat || user.wechat,
-      userRole: booking.userRole || user.role
+      userRole: booking.userRole || user.role,
+      isLocalEvent: booking.isLocalEvent || booking.eventId?.startsWith('local-')
     }
   })
 
