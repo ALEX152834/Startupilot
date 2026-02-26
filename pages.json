@@ -70,7 +70,7 @@
       ]
     },
     {
-      "root": "pages/admin",
+      "root": "subPackages/admin",
       "pages": [
         {
           "path": "redeem-codes",
@@ -109,12 +109,16 @@
       "packages": ["subPackages/profile"]
     },
     "pages/learning/learning": {
-      "network": "all",
+      "network": "wifi",
       "packages": ["subPackages/profile"]
     },
     "pages/projects/projects": {
-      "network": "all",
-      "packages": ["subPackages/projects"]
+      "network": "wifi",
+      "packages": ["subPackages/projects", "subPackages/profile"]
+    },
+    "pages/profile/profile": {
+      "network": "wifi",
+      "packages": ["subPackages/profile", "subPackages/admin"]
     }
   },
   "tabBar": {

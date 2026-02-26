@@ -58,6 +58,7 @@ import Loading from '@/components/loading/loading.vue'
 import { logger } from '@/utils/logger'
 import { useShare } from '@/composables/useShare'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { useNavbar } from '@/composables/useNavbar'
 
 const disableShare = true
 defineExpose({
@@ -73,59 +74,29 @@ const loading = ref(false)
 const refreshing = ref(false)
 const deletingProjectId = ref('')
 
-const DEFAULT_MENU_BUTTON_INFO = { top: 32, height: 32, bottom: 64 }
 const NAV_EXTRA_PADDING = 12
-const DEFAULT_NAVBAR_HEIGHT = (DEFAULT_MENU_BUTTON_INFO.bottom || 64) + NAV_EXTRA_PADDING
-
-const menuButtonInfo = ref({ ...DEFAULT_MENU_BUTTON_INFO })
 const { isAlive } = useSafeAsync()
 
-const isValidNumber = (value) => typeof value === 'number' && !Number.isNaN(value)
-const toPx = (value, fallback) => `${isValidNumber(value) ? value : fallback}px`
-
-const navHeight = computed(() => {
-  const info = menuButtonInfo.value || DEFAULT_MENU_BUTTON_INFO
-  if (isValidNumber(info.bottom)) {
-    return info.bottom + NAV_EXTRA_PADDING
-  }
-  const top = isValidNumber(info.top) ? info.top : DEFAULT_MENU_BUTTON_INFO.top
-  const height = isValidNumber(info.height) ? info.height : DEFAULT_MENU_BUTTON_INFO.height
-  return top + height + NAV_EXTRA_PADDING
+// 使用 useNavbar 获取导航栏信息（包含鸿蒙适配）
+const {
+  navbarHeightStyle,
+  navbarPaddingStyle,
+  navbarRowStyle,
+  buildContentPaddingStyle,
+  isHarmony,
+  refreshNavbarMetrics
+} = useNavbar({
+  defaultMenuButtonInfo: { top: 32, height: 32, left: 0, bottom: 64 },
+  extraPadding: NAV_EXTRA_PADDING,
+  enableWindowInfo: false,
+  logPrefix: '[admin/projects-admin]'
 })
 
-const navbarStyle = computed(() => ({
-  height: toPx(navHeight.value, DEFAULT_NAVBAR_HEIGHT)
-}))
-
-const navbarInnerStyle = computed(() => ({
-  marginTop: toPx(menuButtonInfo.value?.top, DEFAULT_MENU_BUTTON_INFO.top),
-  height: toPx(menuButtonInfo.value?.height, DEFAULT_MENU_BUTTON_INFO.height)
-}))
-
-const pageContentStyle = computed(() => ({
-  paddingTop: toPx(navHeight.value + 16, DEFAULT_NAVBAR_HEIGHT + 16)
-}))
+const navbarStyle = navbarHeightStyle
+const navbarInnerStyle = navbarRowStyle
+const pageContentStyle = buildContentPaddingStyle(16)
 
 const adminProjects = computed(() => projectStore.projectList)
-
-const initNavbarMetrics = () => {
-  try {
-    let info = null
-    if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
-      info = wx.getMenuButtonBoundingClientRect()
-    } else if (typeof uni !== 'undefined' && typeof uni.getMenuButtonBoundingClientRect === 'function') {
-      info = uni.getMenuButtonBoundingClientRect()
-    }
-    if (info && info.height && info.top !== undefined && isAlive.value) {
-      menuButtonInfo.value = {
-        ...DEFAULT_MENU_BUTTON_INFO,
-        ...info
-      }
-    }
-  } catch (error) {
-    logger.error('获取胶囊信息失败:', error)
-  }
-}
 
 const fetchProjects = async (refresh = false) => {
   if (loading.value) return
@@ -189,7 +160,7 @@ const handleBack = () => {
 }
 
 onLoad(() => {
-  initNavbarMetrics()
+  refreshNavbarMetrics()
   fetchProjects(true)
 })
 </script>

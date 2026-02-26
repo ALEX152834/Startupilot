@@ -13,7 +13,12 @@
             "es6" : true,
             "postcss" : true,
             "minified" : true,
-            "newFeature" : true
+            "newFeature" : true,
+            "coverView" : true,
+            "autoAudits" : false,
+            "showShadowRootInWxmlPanel" : true,
+            "packNpmManually" : false,
+            "packNpmRelationList" : []
         },
         "lazyCodeLoading" : "requiredComponents",
         "usingComponents" : true,
@@ -23,7 +28,11 @@
             }
         },
         "requiredPrivateInfos" : [ "getLocation" ],
-        "cloudfunctionRoot" : "cloudfunctions/"
+        "cloudfunctionRoot" : "cloudfunctions/",
+        "optimization" : {
+            "subPackages" : true
+        },
+        "plugins" : {}
     },
     "h5" : {
         "title" : "Startupilot",

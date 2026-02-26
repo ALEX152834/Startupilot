@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
+import { isHarmonyOS, getSafeAreaInfo } from '@/utils/device'
 
 const DEFAULT_MENU_BUTTON_INFO = { top: 32, height: 32, left: 0, bottom: 64 }
 const DEFAULT_WINDOW_INFO = { windowWidth: 375 }
@@ -20,8 +21,17 @@ export function useNavbar(options = {}) {
 
   const menuButtonInfo = ref({ ...defaultMenuButtonInfo })
   const windowInfo = ref({ ...defaultWindowInfo })
+  const isHarmony = ref(false)
+  const safeArea = ref({ safeTop: 0, safeBottom: 0 })
 
-  const navTop = computed(() => getNumber(menuButtonInfo.value?.top, getNumber(defaultMenuButtonInfo?.top)))
+  const navTop = computed(() => {
+    const top = getNumber(menuButtonInfo.value?.top, getNumber(defaultMenuButtonInfo?.top))
+    // 鸿蒙系统可能需要额外的顶部安全距离
+    if (isHarmony.value && safeArea.value.safeTop > top) {
+      return safeArea.value.safeTop
+    }
+    return top
+  })
   const rowHeight = computed(() => {
     const fallbackHeight = rowHeightFallback ?? defaultMenuButtonInfo?.height ?? DEFAULT_MENU_BUTTON_INFO.height
     return getNumber(menuButtonInfo.value?.height, fallbackHeight)
@@ -70,7 +80,20 @@ export function useNavbar(options = {}) {
     top: `${navTop.value + rowHeight.value + extra}px`
   }))
 
+  // 底部安全区域高度（用于底部固定元素避让）
+  const bottomSafeHeight = computed(() => {
+    return getNumber(safeArea.value.safeBottom, 0)
+  })
+
   const refreshNavbarMetrics = () => {
+    // 检测鸿蒙系统
+    isHarmony.value = isHarmonyOS()
+    safeArea.value = getSafeAreaInfo()
+    
+    if (isHarmony.value) {
+      logger.log(`${logPrefix} 检测到鸿蒙系统，安全区域:`, safeArea.value)
+    }
+    
     try {
       let info = null
       if (typeof wx !== 'undefined' && typeof wx.getMenuButtonBoundingClientRect === 'function') {
@@ -117,10 +140,13 @@ export function useNavbar(options = {}) {
   return {
     menuButtonInfo,
     windowInfo,
+    isHarmony,
+    safeArea,
     navTop,
     rowHeight,
     navHeight,
     rightSafeWidth,
+    bottomSafeHeight,
     navbarHeightStyle,
     navbarPaddingStyle,
     navbarRowStyle,

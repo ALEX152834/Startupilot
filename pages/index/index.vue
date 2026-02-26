@@ -133,7 +133,6 @@ import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { useEventStore } from '@/store/event'
 import { useUserStore } from '@/store/user'
 import GlassCard from '@/components/glass-card/glass-card.vue'
-import EventCard from '@/components/event-card/event-card.vue'
 import Skeleton from '@/components/skeleton/skeleton.vue'
 import EmptyState from '@/components/empty-state/empty-state.vue'
 import FormModal from '@/components/modals/form-modal.vue'
@@ -144,7 +143,9 @@ import { showError, showSuccess } from '@/utils/feedback'
 import { logger } from '@/utils/logger'
 import { useNavbar } from '@/composables/useNavbar'
 import { useSafeAsync } from '@/composables/useSafeAsync'
+import { useHarmony } from '@/composables/useHarmony'
 import { getSharePreset } from '@/utils/share-presets'
+import { cachedRequest, deferLoad, preloadImages, perfMonitor } from '@/utils/performance'
 
 const eventStore = useEventStore()
 const userStore = useUserStore()
@@ -159,6 +160,7 @@ const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset
 const LOGO_CDN_URL = getCdnUrl(LOGO_CLOUD_PATH)
 const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
+const { isHarmony, bottomSafeAreaStyle } = useHarmony()
 const {
   navbarHeightStyle,
   buildLogoRowStyle,
@@ -197,46 +199,6 @@ const pageContentStyle = buildContentPaddingStyle()
 const eventList = ref([])
 const bookingSyncing = ref(false)
 
-// 本地活动数据（使用云存储图片）
-const localEvents = [
-  {
-    _id: 'local-1',
-    eventNumber: 'EVT-001',
-    title: 'Bella Ren 创业分享会',
-    date: '2025-11-20',
-    time: '14:00-16:00',
-    type: 'online',
-    location: '线上直播',
-    image: getCdnUrl('profile/活动/Bella Ren.png'),
-    description: '创业经验分享与交流',
-    isBooked: false
-  },
-  {
-    _id: 'local-2',
-    eventNumber: 'EVT-002',
-    title: 'Phoebe 产品设计工作坊',
-    date: '2025-11-22',
-    time: '15:00-17:00',
-    type: 'offline',
-    location: '北京创业大街',
-    image: getCdnUrl('profile/活动/Phoebe.png'),
-    description: '产品设计思维与实践',
-    isBooked: false
-  },
-  {
-    _id: 'local-3',
-    eventNumber: 'EVT-003',
-    title: 'Luna 投资人见面会',
-    date: '2025-11-25',
-    time: '10:00-12:00',
-    type: 'offline',
-    location: '上海张江',
-    image: getCdnUrl('profile/活动/Luna.png'),
-    description: '投资人面对面交流',
-    isBooked: false
-  }
-]
-
 // 云存储图片 - 关于我们（带 jianjin 样式）
 const aboutImages = ref([])
 
@@ -250,11 +212,6 @@ const loadStyledImages = () => {
   safeRun(() => {
     aboutImages.value = CLOUD_STORAGE.about.map(getCdnUrl)
   })
-}
-
-// 加载带样式的活动图片
-const loadStyledEventImages = async () => {
-  return localEvents.map(event => ({ ...event, image: getCdnUrl(event.image) }))
 }
 
 // 根据预约记录同步活动状态
@@ -308,33 +265,65 @@ const faqList = ref([
   }
 ])
 
-// 加载活动列表
+// 加载活动列表 - 优化版本
 const loadEvents = async () => {
   if (!isAlive.value) return
+  perfMonitor.start('loadEvents')
   const taskId = ++loadEventsTaskId
   loading.value = true
   let eventsToRender = []
+  
   try {
-    // 优先使用本地活动（带样式的图片）
-    const styledEvents = await loadStyledEventImages()
-    await syncBookingStatus(styledEvents)
-    eventsToRender = styledEvents
+    // 使用缓存请求，避免重复加载
+    const fetchEvents = async () => {
+      await eventStore.fetchEventList(true)
+      return eventStore.eventList
+    }
     
-    // 如果需要，也可以加载云端活动并合并
-    // await eventStore.fetchEventList(true)
-    // eventList.value = [...styledEvents, ...eventStore.eventList]
+    const events = await cachedRequest(
+      'index_events',
+      fetchEvents,
+      { 
+        ttl: 30000, // 30秒缓存
+        forceRefresh: false,
+        onCacheHit: (cached) => {
+          // 缓存命中时快速渲染
+          if (isAlive.value && taskId === loadEventsTaskId) {
+            const quickRender = cached.map(event => ({
+              ...event,
+              image: event.image ? getCdnUrl(event.image) : ''
+            }))
+            eventList.value = quickRender
+            loading.value = false
+          }
+        }
+      }
+    )
+    
+    // 图片URL处理：将云存储路径转换为CDN URL
+    const eventsWithCdnImages = events.map(event => ({
+      ...event,
+      image: event.image ? getCdnUrl(event.image) : ''
+    }))
+    
+    // 预加载活动图片
+    const imageUrls = eventsWithCdnImages.map(e => e.image).filter(Boolean)
+    preloadImages(imageUrls.slice(0, 3)) // 只预加载前3张
+    
+    // 延迟同步预约状态（非关键路径）
+    deferLoad(() => syncBookingStatus(eventsWithCdnImages), 200)
+    
+    eventsToRender = eventsWithCdnImages
   } catch (error) {
     logger.error('[pages/index] 加载活动失败', error)
-    // 失败时使用原始本地活动
-    const fallbackEvents = localEvents.map(event => ({ ...event }))
-    await syncBookingStatus(fallbackEvents)
-    eventsToRender = fallbackEvents
+    eventsToRender = []
   } finally {
     if (!isAlive.value || taskId !== loadEventsTaskId) {
       return
     }
     eventList.value = eventsToRender
     loading.value = false
+    perfMonitor.end('loadEvents')
   }
 }
 
@@ -487,14 +476,18 @@ onLoad(() => {
 })
 
 onMounted(() => {
-  // 数据埋点
-  trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'index' })
+  perfMonitor.start('indexPageMount')
   
-  // 加载带样式的图片
-  loadStyledImages()
+  // 数据埋点 - 延迟执行，不阻塞首屏
+  deferLoad(() => trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'index' }), 500)
   
-  // 加载数据
+  // 优先加载活动数据（首屏关键内容）
   loadEvents()
+  
+  // 延迟加载非关键内容
+  deferLoad(() => loadStyledImages(), 300)
+  
+  perfMonitor.end('indexPageMount')
 })
 </script>
 

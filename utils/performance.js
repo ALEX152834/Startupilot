@@ -1,151 +1,187 @@
-import { logger } from './logger'
-
 /**
  * 性能优化工具
+ * 包含请求缓存、防抖节流、预加载等功能
  */
 
-/**
- * 防抖函数
- * @param {Function} func - 要执行的函数
- * @param {number} wait - 等待时间（毫秒）
- * @returns {Function}
- */
-export function debounce(func, wait = 300) {
-  let timeout
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout)
-      func(...args)
-    }
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
-  }
-}
+import { logger } from './logger'
+
+// 内存缓存
+const memoryCache = new Map()
 
 /**
- * 节流函数
- * @param {Function} func - 要执行的函数
- * @param {number} limit - 限制时间（毫秒）
- * @returns {Function}
+ * 带缓存的请求包装器
+ * @param {string} key - 缓存键
+ * @param {Function} fetcher - 请求函数
+ * @param {object} options - 配置项
  */
-export function throttle(func, limit = 300) {
-  let inThrottle
-  return function executedFunction(...args) {
-    if (!inThrottle) {
-      func(...args)
-      inThrottle = true
-      setTimeout(() => inThrottle = false, limit)
+export async function cachedRequest(key, fetcher, options = {}) {
+  const {
+    ttl = 60000, // 默认缓存1分钟
+    forceRefresh = false,
+    onCacheHit = null
+  } = options
+
+  // 检查内存缓存
+  if (!forceRefresh && memoryCache.has(key)) {
+    const cached = memoryCache.get(key)
+    if (Date.now() - cached.timestamp < ttl) {
+      logger.log(`[cache] 命中缓存: ${key}`)
+      onCacheHit && onCacheHit(cached.data)
+      return cached.data
     }
   }
-}
 
-/**
- * 图片压缩
- * @param {string} src - 图片路径
- * @param {number} quality - 压缩质量 0-100
- * @returns {Promise<string>}
- */
-export async function compressImage(src, quality = 80) {
-  try {
-    const result = await uni.compressImage({
-      src,
-      quality
-    })
-    return result[1].tempFilePath
-  } catch (error) {
-    logger.error('图片压缩失败:', error)
-    return src
-  }
-}
-
-/**
- * 懒加载图片
- * @param {string} src - 图片路径
- * @returns {object}
- */
-export function lazyLoadImage(src) {
-  return {
-    src,
-    lazyLoad: true,
-    mode: 'aspectFill'
-  }
-}
-
-/**
- * 监控页面性能
- */
-export function monitorPagePerformance() {
-  const performance = uni.getPerformance()
-  const isProdEnv = typeof process !== 'undefined' && process && process.env && process.env.NODE_ENV === 'production'
+  // 执行请求
+  const data = await fetcher()
   
-  if (performance) {
-    // 获取性能数据
-    const observer = performance.createObserver((entryList) => {
-      const entries = entryList.getEntries()
-      entries.forEach((entry) => {
-        logger.log('[performance] entry', entry)
-        
-        // 上报性能数据
-        if (isProdEnv) {
-          reportPerformance(entry)
-        }
-      })
-    })
-    
-    observer.observe({ entryTypes: ['render', 'script'] })
+  // 存入缓存
+  memoryCache.set(key, {
+    data,
+    timestamp: Date.now()
+  })
+
+  return data
+}
+
+/**
+ * 清除指定缓存
+ */
+export function clearCache(key) {
+  if (key) {
+    memoryCache.delete(key)
+  } else {
+    memoryCache.clear()
   }
 }
 
 /**
- * 上报性能数据
- * @param {object} entry - 性能数据
+ * 请求去重 - 相同请求只执行一次
  */
-function reportPerformance(entry) {
-  // TODO: 实现性能数据上报
-  logger.error('[performance] Report Performance (TODO)', entry)
-}
+const pendingRequests = new Map()
 
-/**
- * 优化长列表渲染
- * @param {Array} list - 列表数据
- * @param {number} pageSize - 每页大小
- * @returns {Array}
- */
-export function optimizeLongList(list, pageSize = 20) {
-  // 虚拟列表优化（简化版）
-  const totalPages = Math.ceil(list.length / pageSize)
-  const pages = []
-  
-  for (let i = 0; i < totalPages; i++) {
-    const start = i * pageSize
-    const end = start + pageSize
-    pages.push(list.slice(start, end))
+export async function dedupeRequest(key, fetcher) {
+  // 如果已有相同请求在进行中，返回同一个Promise
+  if (pendingRequests.has(key)) {
+    logger.log(`[dedupe] 复用进行中的请求: ${key}`)
+    return pendingRequests.get(key)
   }
-  
-  return pages
+
+  const promise = fetcher().finally(() => {
+    pendingRequests.delete(key)
+  })
+
+  pendingRequests.set(key, promise)
+  return promise
 }
 
 /**
- * 预加载图片
- * @param {Array} urls - 图片URL数组
+ * 延迟执行 - 用于非关键数据加载
  */
-export function preloadImages(urls) {
-  urls.forEach(url => {
-    uni.getImageInfo({
-      src: url,
-      success: () => {
-        logger.log('图片预加载成功:', url)
-      }
-    })
+export function deferLoad(fn, delay = 100) {
+  return new Promise((resolve) => {
+    setTimeout(async () => {
+      const result = await fn()
+      resolve(result)
+    }, delay)
   })
 }
 
 /**
- * 节流滚动事件
- * @param {Function} callback - 回调函数
- * @returns {Function}
+ * 空闲时执行 - 利用浏览器空闲时间
  */
-export function throttleScroll(callback) {
-  return throttle(callback, 100)
+export function idleLoad(fn) {
+  return new Promise((resolve) => {
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(async () => {
+        const result = await fn()
+        resolve(result)
+      })
+    } else {
+      // 小程序环境降级为setTimeout
+      setTimeout(async () => {
+        const result = await fn()
+        resolve(result)
+      }, 50)
+    }
+  })
 }
 
+/**
+ * 批量请求优化 - 合并多个请求
+ */
+const batchQueue = new Map()
+const BATCH_DELAY = 50
+
+export function batchRequest(key, params, fetcher) {
+  return new Promise((resolve, reject) => {
+    if (!batchQueue.has(key)) {
+      batchQueue.set(key, {
+        params: [],
+        resolvers: [],
+        timer: null
+      })
+    }
+
+    const batch = batchQueue.get(key)
+    batch.params.push(params)
+    batch.resolvers.push({ resolve, reject })
+
+    // 清除之前的定时器
+    if (batch.timer) {
+      clearTimeout(batch.timer)
+    }
+
+    // 设置新的定时器，延迟执行批量请求
+    batch.timer = setTimeout(async () => {
+      const { params: allParams, resolvers } = batch
+      batchQueue.delete(key)
+
+      try {
+        const results = await fetcher(allParams)
+        resolvers.forEach((r, i) => r.resolve(results[i] || results))
+      } catch (error) {
+        resolvers.forEach(r => r.reject(error))
+      }
+    }, BATCH_DELAY)
+  })
+}
+
+/**
+ * 图片预加载
+ */
+export function preloadImages(urls) {
+  if (!Array.isArray(urls) || urls.length === 0) return
+
+  urls.forEach(url => {
+    if (!url) return
+    // 小程序环境使用 uni.getImageInfo 预加载
+    if (typeof uni !== 'undefined' && uni.getImageInfo) {
+      uni.getImageInfo({
+        src: url,
+        fail: () => {} // 静默失败
+      })
+    }
+  })
+}
+
+/**
+ * 性能监控
+ */
+export const perfMonitor = {
+  marks: new Map(),
+
+  start(name) {
+    this.marks.set(name, Date.now())
+  },
+
+  end(name) {
+    const start = this.marks.get(name)
+    if (start) {
+      const duration = Date.now() - start
+      logger.log(`[perf] ${name}: ${duration}ms`)
+      this.marks.delete(name)
+      return duration
+    }
+    return 0
+  }
+}

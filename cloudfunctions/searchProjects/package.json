@@ -1,0 +1,10 @@
+{
+  "name": "searchProjects",
+  "version": "1.0.0",
+  "description": "AI 数据查询云函数 - 支持 HTTP 触发和小程序调用",
+  "main": "index.js",
+  "keywords": ["ai", "search", "projects", "api"],
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

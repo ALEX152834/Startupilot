@@ -4,6 +4,10 @@ import storage from '@/utils/storage'
 import { STORAGE_KEYS } from '@/utils/constants'
 import { logger } from '@/utils/logger'
 
+// 缓存配置
+const CACHE_TTL = 30000 // 30秒
+let lastFetchTime = 0
+
 export const useEventStore = defineStore('event', {
   state: () => ({
     eventList: [],
@@ -29,12 +33,20 @@ export const useEventStore = defineStore('event', {
   },
 
   actions: {
-    // 获取活动列表
+    // 获取活动列表 - 优化版本
     async fetchEventList(refresh = false) {
+      const now = Date.now()
+      
+      // 防抖：短时间内重复请求直接返回缓存
+      if (!refresh && this.eventList.length > 0 && (now - lastFetchTime) < CACHE_TTL) {
+        logger.log('[eventStore] 使用内存缓存，跳过请求')
+        return
+      }
+
       if (refresh) {
         this.page = 1
         this.hasMore = true
-        this.eventList = []
+        // 不清空列表，保持旧数据显示直到新数据加载完成
       }
 
       if (!this.hasMore || this.loading) return
@@ -42,13 +54,12 @@ export const useEventStore = defineStore('event', {
       this.loading = true
 
       try {
-        // 先尝试从缓存读取
-        if (this.page === 1) {
+        // 先尝试从本地缓存快速渲染
+        if (this.page === 1 && this.eventList.length === 0) {
           const cache = storage.getCache(STORAGE_KEYS.EVENTS_CACHE)
-          if (cache) {
+          if (cache && cache.length > 0) {
             this.eventList = cache
-            this.loading = false
-            return
+            logger.log('[eventStore] 使用本地缓存快速渲染')
           }
         }
 
@@ -64,6 +75,7 @@ export const useEventStore = defineStore('event', {
           this.eventList = list
           // 缓存第一页数据
           storage.setCache(STORAGE_KEYS.EVENTS_CACHE, list)
+          lastFetchTime = now
         } else {
           this.eventList.push(...list)
         }

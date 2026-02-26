@@ -96,6 +96,23 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* 鸿蒙系统额外安全区适配 */
+.harmony-safe-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.harmony-safe-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 鸿蒙系统底部固定元素适配 */
+.harmony-fixed-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* 页面容器 */
 .page-container {
   min-height: 100vh;

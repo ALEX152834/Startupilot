@@ -119,13 +119,16 @@ import RedeemModal from '@/components/modals/redeem-modal.vue'
 import { logger } from '@/utils/logger'
 import { useSafeAsync } from '@/composables/useSafeAsync'
 import { useNavbar } from '@/composables/useNavbar'
+import { useHarmony } from '@/composables/useHarmony'
 import { getSharePreset } from '@/utils/share-presets'
 import { getCdnUrl } from '@/utils/cloud-storage'
+import { cachedRequest, deferLoad } from '@/utils/performance'
 
 const userStore = useUserStore()
 const { title: shareTitle, path: sharePath, image: shareImage } = getSharePreset('learning')
 const SHARE_CDN_IMAGE = shareImage
 const { isAlive, safeRun } = useSafeAsync()
+const { isHarmony, bottomSafeAreaStyle } = useHarmony()
 
 // 分享给好友
 onShareAppMessage(() => {
@@ -204,7 +207,7 @@ watch(currentTab, () => {
   loadResources(true)
 })
 
-// 加载资源列表
+// 加载资源列表 - 优化版本
 const loadResources = async (refresh = false) => {
   if (!isAlive.value) return
   if (refresh) {
@@ -219,12 +222,18 @@ const loadResources = async (refresh = false) => {
   loading.value = true
   
   try {
-    const result = await learningApi.getList({
-      type: currentTab.value,
-      keyword: searchKeyword.value,
-      page: page.value,
-      pageSize
-    })
+    // 使用缓存请求
+    const cacheKey = `learning_${currentTab.value}_${searchKeyword.value}_${page.value}`
+    const result = await cachedRequest(
+      cacheKey,
+      () => learningApi.getList({
+        type: currentTab.value,
+        keyword: searchKeyword.value,
+        page: page.value,
+        pageSize
+      }),
+      { ttl: 60000 } // 1分钟缓存
+    )
     
     const { list, total } = result
     
@@ -510,8 +519,8 @@ onLoad(() => {
 })
 
 onMounted(() => {
-  // 数据埋点
-  trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'learning' })
+  // 数据埋点 - 延迟执行
+  deferLoad(() => trackEvent(TRACK_EVENTS.PAGE_VIEW, { page: 'learning' }), 500)
   
   // 加载数据
   loadResources(true)
